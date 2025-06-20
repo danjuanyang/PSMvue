@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { NCard, NStatistic, NGrid, NGridItem } from "naive-ui";
-import { useUserStore } from "@/stores/user";
+import { useUserStore } from "../../stores/user";
 
 const userStore = useUserStore();
 

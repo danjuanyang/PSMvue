@@ -5,11 +5,11 @@ import { NCard, NForm, NFormItem, NInput, NButton, NSpace, useMessage } from "na
 import { loginApi } from "../../api/auth";
 import type { LoginData } from "../../types/api";
 // 如果你使用了 Pinia store，则在这里引入
-// import { useUserStore } from '@/stores/user';
+import { useUserStore } from "../../stores/user";
 
 const router = useRouter();
 const message = useMessage();
-// const userStore = useUserStore(); // Pinia store
+const userStore = useUserStore(); // Pinia store
 
 const loginFormRef = ref<any>(null);
 const loading = ref(false);

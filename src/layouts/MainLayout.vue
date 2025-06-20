@@ -12,11 +12,11 @@ import {
 } from "naive-ui";
 import type { MenuOption } from "naive-ui";
 // 导入 Pinia store 来执行登出操作
-// import { useUserStore } from '@/stores/user';
+import { useUserStore } from "../stores/user";
 
 const router = useRouter();
 const message = useMessage();
-// const userStore = useUserStore();
+const userStore = useUserStore();
 
 const collapsed = ref(false);
 
@@ -69,7 +69,7 @@ const handleMenuSelect = (key: string, item: MenuOption) => {
 
 const handleLogout = async () => {
   try {
-    // await userStore.logout(); // 调用 Pinia action
+    await userStore.logout(); // 调用 Pinia action
     message.success("您已成功登出");
     router.push("/auth/login");
   } catch (error) {
