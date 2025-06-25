@@ -1,6 +1,49 @@
+<template>
+  <n-layout position="absolute">
+    <n-layout-header
+      bordered
+      style="height: 64px; padding: 0 24px"
+      class="flex items-center"
+    >
+      <h1 class="text-xl font-bold text-gray-800">PSM - Vue</h1>
+      <div class="flex-grow" />
+      <n-space align="center">
+        <n-tag :bordered="false" type="success">{{ userStore.userInfo?.username }}</n-tag>
+        <n-button type="error" ghost @click="logout">退出登录</n-button>
+      </n-space>
+    </n-layout-header>
+
+    <n-layout has-sider position="absolute" style="top: 64px">
+      <n-layout-sider
+        bordered
+        show-trigger
+        collapse-mode="width"
+        :collapsed-width="64"
+        :width="240"
+        :native-scrollbar="false"
+      >
+        <n-menu
+          :options="menuOptions"
+          :collapsed-width="64"
+          :collapsed-icon-size="22"
+          :default-value="activeMenu"
+        />
+      </n-layout-sider>
+
+      <n-layout-content
+        content-style="padding: 24px; background-color: #f0f2f5;"
+        :native-scrollbar="false"
+      >
+        <router-view />
+      </n-layout-content>
+    </n-layout>
+  </n-layout>
+</template>
+
 <script setup lang="ts">
-import { ref } from "vue";
-import { RouterView, useRouter } from "vue-router";
+import { h, computed } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
+import type { MenuOption } from "naive-ui";
 import {
   NLayout,
   NLayoutSider,
@@ -8,134 +51,69 @@ import {
   NLayoutContent,
   NMenu,
   NButton,
-  useMessage,
+  NSpace,
+  NTag,
 } from "naive-ui";
-import type { MenuOption } from "naive-ui";
-// 导入 Pinia store 来执行登出操作
 import { useUserStore } from "../stores/user";
 
 const router = useRouter();
-const message = useMessage();
+const route = useRoute();
 const userStore = useUserStore();
 
-const collapsed = ref(false);
+const activeMenu = computed(() => route.name as string);
 
-// 模拟的菜单数据
-const menuOptions: MenuOption[] = [
-  {
-    label: "仪表盘",
-    key: "dashboard",
-    path: "/dashboard",
-  },
-  {
-    label: "系统管理",
-    key: "admin",
-    children: [
-      {
-        label: "用户管理",
-        key: "user-management",
-        path: "/admin/users",
-      },
-      {
-        label: "角色管理",
-        key: "role-management",
-        path: "/admin/roles",
-      },
-      {
-        label: "日志查看",
-        key: "log-viewer",
-        path: "/admin/logs",
-      },
-    ],
-  },
-  {
-    label: "项目管理",
-    key: "project",
-    children: [
-      {
-        label: "项目列表",
-        key: "project-list",
-        path: "/project/list",
-      },
-    ],
-  },
-];
+// **关键修改**: 将 menuOptions 转换为 computed 属性
+const menuOptions = computed<MenuOption[]>(() => {
+  const isAdmin = userStore.userRole === "ADMIN" || userStore.userRole === "SUPER";
 
-const handleMenuSelect = (key: string, item: MenuOption) => {
-  if (item.path) {
-    router.push(item.path as string);
+  const baseItems: MenuOption[] = [
+    {
+      label: () =>
+        h(RouterLink, { to: { name: "dashboard" } }, { default: () => "仪表盘" }),
+      key: "dashboard",
+    },
+  ];
+
+  const adminItems: MenuOption[] = [
+    {
+      label: "系统管理",
+      key: "system-management",
+      children: [
+        {
+          label: () =>
+            h(
+              RouterLink,
+              { to: { name: "user-management" } },
+              { default: () => "用户管理" }
+            ),
+          key: "user-management",
+        },
+        {
+          label: () =>
+            h(
+              RouterLink,
+              { to: { name: "role-management" } },
+              { default: () => "角色管理" }
+            ),
+          key: "role-management",
+        },
+      ],
+    },
+  ];
+
+  if (isAdmin) {
+    return [...baseItems, ...adminItems];
   }
-};
 
-const handleLogout = async () => {
-  try {
-    await userStore.logout(); // 调用 Pinia action
-    message.success("您已成功登出");
-    router.push("/auth/login");
-  } catch (error) {
-    message.error("登出失败");
-  }
+  return baseItems;
+});
+
+const logout = () => {
+  userStore.logout();
+  router.push("/auth/login");
 };
 </script>
 
-<template>
-  <n-layout style="height: 100vh">
-    <n-layout-header
-      style="
-        height: 64px;
-        padding: 0 24px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-      "
-      bordered
-    >
-      <div class="text-xl font-bold">PSM - Vue</div>
-      <n-button type="error" @click="handleLogout">退出登录</n-button>
-    </n-layout-header>
-    <n-layout has-sider>
-      <n-layout-sider
-        bordered
-        collapse-mode="width"
-        :collapsed-width="64"
-        :width="240"
-        :collapsed="collapsed"
-        show-trigger
-        @collapse="collapsed = true"
-        @expand="collapsed = false"
-      >
-        <n-menu
-          :collapsed="collapsed"
-          :collapsed-width="64"
-          :collapsed-icon-size="22"
-          :options="menuOptions"
-          @update:value="handleMenuSelect"
-        />
-      </n-layout-sider>
-      <n-layout-content style="padding: 24px">
-        <router-view v-slot="{ Component }">
-          <transition name="fade-transform" mode="out-in">
-            <component :is="Component" />
-          </transition>
-        </router-view>
-      </n-layout-content>
-    </n-layout>
-  </n-layout>
-</template>
-
 <style scoped>
-.fade-transform-leave-active,
-.fade-transform-enter-active {
-  transition: all 0.5s;
-}
-
-.fade-transform-enter-from {
-  opacity: 0;
-  transform: translateX(-30px);
-}
-
-.fade-transform-leave-to {
-  opacity: 0;
-  transform: translateX(30px);
-}
+/* 无需特定样式，因为n-layout可以处理所有内容 */
 </style>

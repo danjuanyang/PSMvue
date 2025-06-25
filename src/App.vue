@@ -1,25 +1,44 @@
+<template>
+  <n-config-provider :theme="theme" :locale="zhCN" :date-locale="dateZhCN">
+    <n-global-style />
+    <n-message-provider>
+      <n-dialog-provider>
+        <n-notification-provider>
+          <router-view />
+        </n-notification-provider>
+      </n-dialog-provider>
+    </n-message-provider>
+  </n-config-provider>
+</template>
+
 <script setup lang="ts">
-import { RouterView } from "vue-router";
 import {
+  NConfigProvider,
   NMessageProvider,
   NDialogProvider,
   NNotificationProvider,
-  NLoadingBarProvider,
+  NGlobalStyle,
+  lightTheme,
+  darkTheme,
+  zhCN,
+  dateZhCN,
 } from "naive-ui";
+
+// 你可以根据用户偏好或系统设置来切换主题
+const theme = lightTheme; // 或者 darkTheme
 </script>
 
-<template>
-  <n-loading-bar-provider>
-    <n-dialog-provider>
-      <n-notification-provider>
-        <n-message-provider>
-          <router-view />
-        </n-message-provider>
-      </n-notification-provider>
-    </n-dialog-provider>
-  </n-loading-bar-provider>
-</template>
+<style>
+#app {
+  height: 100vh;
+  width: 100vw;
+}
 
-<style scoped>
-/* 你可以在这里添加一些全局的样式 */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+}
 </style>

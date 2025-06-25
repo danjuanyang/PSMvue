@@ -1,70 +1,157 @@
+<template>
+  <div class="h-full w-full flex flex-col">
+    <n-card
+      title="用户管理"
+      :bordered="false"
+      class="flex-1 rounded-lg shadow-md"
+      content-style="display: flex; flex-direction: column;"
+    >
+      <n-spin :show="loading" class="flex-1">
+        <n-data-table
+          :columns="columns"
+          :data="filteredUsers"
+          :pagination="pagination"
+          :bordered="false"
+          flex-height
+          class="h-full"
+        />
+      </n-spin>
+    </n-card>
+  </div>
+
+  <!-- Modals remain the same -->
+  <n-modal
+    v-model:show="showRoleModal"
+    preset="card"
+    style="width: 450px"
+    title="编辑用户角色"
+  >
+    <p class="mb-4">
+      正在为用户 <n-tag type="info">{{ currentUser?.username }}</n-tag> 分配角色。
+    </p>
+    <n-select v-model:value="selectedRole" :options="roleOptionsForSelect" />
+    <template #footer>
+      <div class="flex justify-end space-x-2">
+        <n-button @click="showRoleModal = false">取消</n-button>
+        <n-button type="primary" :loading="savingRole" @click="handleRoleUpdate"
+          >保存</n-button
+        >
+      </div>
+    </template>
+  </n-modal>
+  <n-modal
+    v-model:show="showPermissionModal"
+    preset="card"
+    style="width: 600px"
+    title="编辑用户特定权限"
+  >
+    <p class="mb-4">
+      正在为用户
+      <n-tag type="info">{{ currentUser?.username }}</n-tag>
+      分配特定权限。这些权限会覆盖角色默认权限。
+    </p>
+    <n-spin :show="loadingUserPermissions">
+      <n-scrollbar style="max-height: 50vh">
+        <n-transfer
+          v-if="!loadingUserPermissions"
+          ref="transfer"
+          v-model:value="userPermissions"
+          :options="allPermissionsOptions"
+          source-filterable
+        />
+      </n-scrollbar>
+    </n-spin>
+    <template #footer>
+      <div class="flex justify-end space-x-2">
+        <n-button @click="showPermissionModal = false">取消</n-button>
+        <n-button
+          type="primary"
+          :loading="savingPermissions"
+          @click="handlePermissionsUpdate"
+          >保存</n-button
+        >
+      </div>
+    </template>
+  </n-modal>
+</template>
+
 <script setup lang="ts">
-import { ref, h, onMounted } from "vue";
+import { ref, onMounted, h, computed } from "vue";
 import {
   NDataTable,
   NButton,
-  NSpace,
-  useMessage,
-  NModal,
   NCard,
-  NSelect,
-  NDivider,
-  NCheckbox,
   NSpin,
+  useMessage,
+  NTag,
+  NModal,
+  NSelect,
+  NTransfer,
+  NScrollbar,
 } from "naive-ui";
 import type { DataTableColumns } from "naive-ui";
+import { useUserStore } from "../../stores/user";
 import {
-  getUsersApi,
-  getUserDetailsApi,
-  getPermissionsApi,
-  updateUserRoleApi,
-  modifyUserPermissionApi,
-  getRolesApi,
-} from "@/api/admin";
-import type { User, UserDetails, Permission, Role } from "@/types/api";
+  getAllUsers,
+  getAllPermissions,
+  updateUserRole,
+  getUserById,
+  updateUserPermission,
+} from "../../api/admin";
+import type { User, Permission } from "../../types/api";
 
 const message = useMessage();
+const userStore = useUserStore();
+
 const loading = ref(true);
-const users = ref<User[]>([]);
-const pagination = ref({ page: 1, pageSize: 10, itemCount: 0 });
-
-// 弹窗相关状态
-const showModal = ref(false);
-const modalLoading = ref(false);
-const selectedUser = ref<UserDetails | null>(null);
+const allUsers = ref<User[]>([]); // Store all users from the API
 const allPermissions = ref<Permission[]>([]);
-const allRoles = ref<Role[]>([]);
+
+const pagination = { pageSize: 10 };
+
+const showRoleModal = ref(false);
+const showPermissionModal = ref(false);
+const loadingUserPermissions = ref(false);
+const currentUser = ref<User | null>(null);
 const selectedRole = ref<string | null>(null);
-const userPermissions = ref<Record<string, boolean>>({});
+const originalUserPermissions = ref<string[]>([]);
+const userPermissions = ref<string[]>([]);
+const savingRole = ref(false);
+const savingPermissions = ref(false);
 
-const columns: DataTableColumns<User> = [
-  { title: "ID", key: "id", width: 80 },
-  { title: "用户名", key: "username" },
-  { title: "邮箱", key: "email" },
-  { title: "角色", key: "role" },
-  {
-    title: "操作",
-    key: "actions",
-    render(row) {
-      return h(
-        NButton,
-        {
-          size: "small",
-          onClick: () => handleManageClick(row),
-        },
-        { default: () => "管理" }
-      );
-    },
-  },
-];
+const currentUserRole = computed(() => userStore.userInfo?.role);
 
-const fetchUsers = async (page = 1, pageSize = 10) => {
+const filteredUsers = computed(() => {
+  if (currentUserRole.value === "ADMIN") {
+    return allUsers.value.filter((user) => user.role !== "SUPER");
+  }
+  return allUsers.value;
+});
+
+const roleOptionsForSelect = computed(() => {
+  const allRoles = [
+    { label: "SUPER", value: "SUPER" },
+    { label: "ADMIN", value: "ADMIN" },
+    { label: "LEADER", value: "LEADER" },
+    { label: "MEMBER", value: "MEMBER" },
+  ];
+  if (currentUserRole.value === "ADMIN") {
+    return allRoles.filter((r) => r.value !== "SUPER");
+  }
+  return allRoles;
+});
+
+const allPermissionsOptions = computed(() =>
+  allPermissions.value.map((p) => ({ label: p.name, value: p.name }))
+);
+
+const fetchUsers = async () => {
   loading.value = true;
   try {
-    const data: any = await getUsersApi({ page: page, per_page: pageSize });
-    users.value = data.users;
-    pagination.value.itemCount = data.total_users;
-    pagination.value.page = data.current_page;
+    const response = await getAllUsers();
+    if (response && response.users) {
+      allUsers.value = response.users;
+    }
   } catch (error) {
     message.error("获取用户列表失败");
   } finally {
@@ -72,120 +159,145 @@ const fetchUsers = async (page = 1, pageSize = 10) => {
   }
 };
 
-const handleManageClick = async (user: User) => {
-  showModal.value = true;
-  modalLoading.value = true;
-  try {
-    const [userDetails, permissions, roles] = await Promise.all([
-      getUserDetailsApi(user.id),
-      getPermissionsApi(),
-      getRolesApi(),
-    ]);
-    selectedUser.value = userDetails;
-    selectedRole.value = userDetails.role;
-    allPermissions.value = permissions;
-    allRoles.value = roles.map((r) => ({ ...r, label: r.name, value: r.name }));
-
-    // 初始化用户特定权限的 Record
-    const perms: Record<string, boolean> = {};
-    permissions.forEach((p) => {
-      const userPerm = userDetails.specific_permissions.find((up) => up.name === p.name);
-      perms[p.name] = userPerm ? userPerm.allowed : false; // 默认为 false
-    });
-    userPermissions.value = perms;
-  } catch (error) {
-    message.error("获取用户详情失败");
-    showModal.value = false;
-  } finally {
-    modalLoading.value = false;
-  }
-};
-
-const handleRoleSave = async () => {
-  if (!selectedUser.value || !selectedRole.value) return;
-  modalLoading.value = true;
-  try {
-    await updateUserRoleApi(selectedUser.value.id, selectedRole.value);
-    message.success("用户角色更新成功");
-    fetchUsers(pagination.value.page, pagination.value.pageSize); // 刷新列表
-  } catch (error) {
-    message.error("更新角色失败");
-  } finally {
-    modalLoading.value = false;
-  }
-};
-
-const handlePermissionSave = async () => {
-  if (!selectedUser.value) return;
-  modalLoading.value = true;
-  try {
-    const promises = Object.entries(userPermissions.value).map(([name, allowed]) =>
-      modifyUserPermissionApi(selectedUser.value!.id, name, allowed)
-    );
-    await Promise.all(promises);
-    message.success("用户特定权限更新成功");
-    showModal.value = false;
-  } catch (error) {
-    message.error("更新权限失败");
-  } finally {
-    modalLoading.value = false;
-  }
-};
-
-const handlePageChange = (page: number) => {
-  fetchUsers(page, pagination.value.pageSize);
-};
-
 onMounted(() => {
   fetchUsers();
+  getAllPermissions().then((res) => {
+    if (res && Array.isArray(res)) {
+      allPermissions.value = res;
+    }
+  });
 });
+
+const editPermissions = async (row: User) => {
+  currentUser.value = row;
+  showPermissionModal.value = true;
+  loadingUserPermissions.value = true;
+  try {
+    const userInfo = await getUserById(row.id);
+    const allowedPerms = userInfo.specific_permissions
+      .filter((p) => p.allowed)
+      .map((p) => p.name);
+    userPermissions.value = [...allowedPerms];
+    originalUserPermissions.value = [...allowedPerms];
+  } catch (e) {
+    message.error("获取用户特定权限失败");
+  } finally {
+    loadingUserPermissions.value = false;
+  }
+};
+
+// **关键修改**：移除了对 `created_at` 的引用
+const columns: DataTableColumns<User> = [
+  { title: "ID", key: "id", width: 60, sorter: (a, b) => a.id - b.id },
+  {
+    title: "用户名",
+    key: "username",
+    sorter: "default",
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: "邮箱",
+    key: "email",
+    ellipsis: { tooltip: true },
+  },
+  {
+    title: "角色",
+    key: "role",
+    render(row) {
+      let tagType: "success" | "warning" | "error" = "success";
+      if (row.role === "ADMIN") tagType = "warning";
+      if (row.role === "SUPER") tagType = "error";
+      return h(NTag, { type: tagType, bordered: false }, { default: () => row.role });
+    },
+  },
+  {
+    title: "操作",
+    key: "actions",
+    width: 200,
+    fixed: "right",
+    render(row) {
+      const isTargetSuper = row.role === "SUPER";
+      const canNotEdit = currentUserRole.value === "ADMIN" && isTargetSuper;
+
+      return h("div", { class: "space-x-2" }, [
+        h(
+          NButton,
+          {
+            size: "small",
+            onClick: () => {
+              currentUser.value = row;
+              selectedRole.value = row.role;
+              showRoleModal.value = true;
+            },
+            disabled: canNotEdit,
+          },
+          { default: () => "编辑角色" }
+        ),
+        h(
+          NButton,
+          {
+            size: "small",
+            type: "primary",
+            ghost: true,
+            onClick: () => editPermissions(row),
+            disabled: canNotEdit,
+          },
+          { default: () => "编辑权限" }
+        ),
+      ]);
+    },
+  },
+];
+
+const handleRoleUpdate = async () => {
+  if (!currentUser.value || !selectedRole.value) return;
+  savingRole.value = true;
+  try {
+    await updateUserRole(currentUser.value.id, selectedRole.value);
+    message.success("角色更新成功");
+    fetchUsers(); // Refresh table
+    showRoleModal.value = false;
+  } catch (error) {
+    message.error("角色更新失败");
+  } finally {
+    savingRole.value = false;
+  }
+};
+
+const handlePermissionsUpdate = async () => {
+  if (!currentUser.value) return;
+  savingPermissions.value = true;
+
+  const added = userPermissions.value.filter(
+    (p) => !originalUserPermissions.value.includes(p)
+  );
+  const removed = originalUserPermissions.value.filter(
+    (p) => !userPermissions.value.includes(p)
+  );
+
+  const apiCalls = [
+    ...added.map((p) =>
+      updateUserPermission(currentUser.value!.id, {
+        permission_name: p,
+        is_allowed: true,
+      })
+    ),
+    ...removed.map((p) =>
+      updateUserPermission(currentUser.value!.id, {
+        permission_name: p,
+        is_allowed: false,
+      })
+    ),
+  ];
+
+  try {
+    await Promise.all(apiCalls);
+    message.success("用户特定权限更新成功");
+    showPermissionModal.value = false;
+  } catch (error) {
+    message.error("权限更新失败");
+  } finally {
+    savingPermissions.value = false;
+  }
+};
 </script>
-
-<template>
-  <n-card title="用户管理">
-    <n-data-table
-      :columns="columns"
-      :data="users"
-      :loading="loading"
-      :pagination="pagination"
-      :remote="true"
-      @update:page="handlePageChange"
-    />
-  </n-card>
-
-  <n-modal v-model:show="showModal" :mask-closable="false">
-    <n-card
-      style="width: 600px"
-      :title="`管理用户 - ${selectedUser?.username}`"
-      :bordered="false"
-      size="huge"
-      role="dialog"
-      aria-modal="true"
-    >
-      <n-spin :show="modalLoading">
-        <n-space vertical>
-          <!-- 角色管理 -->
-          <h3>角色分配</h3>
-          <n-select v-model:value="selectedRole" :options="allRoles" />
-          <n-button type="primary" @click="handleRoleSave">保存角色</n-button>
-          <n-divider />
-
-          <!-- 特定权限管理 -->
-          <h3>特定权限</h3>
-          <n-space item-style="display: flex;">
-            <n-checkbox
-              v-for="perm in allPermissions"
-              :key="perm.id"
-              v-model:checked="userPermissions[perm.name]"
-            >
-              {{ perm.description }} ({{ perm.name }})
-            </n-checkbox>
-          </n-space>
-          <n-button type="primary" @click="handlePermissionSave" class="mt-4"
-            >保存权限</n-button
-          >
-        </n-space>
-      </n-spin>
-    </n-card>
-  </n-modal>
-</template>

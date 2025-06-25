@@ -1,138 +1,180 @@
+<template>
+  <div class="p-6">
+    <n-card title="角色权限管理" :bordered="false" class="rounded-lg shadow-md">
+      <n-spin :show="loading">
+        <n-grid :x-gap="24" :y-gap="16" :cols="3">
+          <!-- 角色列表 -->
+          <n-gi :span="1">
+            <n-card title="角色列表" size="small" class="h-full">
+              <n-list hoverable clickable>
+                <n-list-item
+                  v-for="role in roles"
+                  :key="role.name"
+                  @click="handleRoleSelect(role)"
+                  :class="{
+                    'bg-blue-100 dark:bg-blue-900': selectedRole?.name === role.name,
+                  }"
+                >
+                  <n-thing :title="role.name" />
+                </n-list-item>
+              </n-list>
+            </n-card>
+          </n-gi>
+
+          <!-- 权限配置 -->
+          <n-gi :span="2">
+            <n-card
+              v-if="selectedRole"
+              :title="`配置 '${selectedRole.name}' 角色的权限`"
+              size="small"
+              class="h-full"
+            >
+              <n-spin :show="loadingPermissions">
+                <n-scrollbar style="max-height: 60vh">
+                  <n-checkbox-group v-model:value="currentPermissionNames">
+                    <n-grid :y-gap="16" :x-gap="16" :cols="2">
+                      <n-gi v-for="permission in allPermissions" :key="permission.id">
+                        <n-checkbox :value="permission.name" :label="permission.name" />
+                        <p class="text-xs text-gray-500 ml-6">
+                          {{ permission.description }}
+                        </p>
+                      </n-gi>
+                    </n-grid>
+                  </n-checkbox-group>
+                </n-scrollbar>
+              </n-spin>
+              <template #footer>
+                <div class="flex justify-end space-x-4">
+                  <n-button @click="resetPermissions" :disabled="loadingPermissions"
+                    >重置</n-button
+                  >
+                  <n-button
+                    type="primary"
+                    @click="handleSave"
+                    :loading="saving || loadingPermissions"
+                  >
+                    保存更改
+                  </n-button>
+                </div>
+              </template>
+            </n-card>
+            <n-card v-else class="h-full flex items-center justify-center">
+              <n-empty description="请先从左侧选择一个角色进行配置" />
+            </n-card>
+          </n-gi>
+        </n-grid>
+      </n-spin>
+    </n-card>
+  </div>
+</template>
+
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted } from "vue";
 import {
   NCard,
-  NTabs,
-  NTabPane,
+  NGrid,
+  NGi,
+  NList,
+  NListItem,
+  NThing,
+  NCheckboxGroup,
   NCheckbox,
-  NSpace,
   NButton,
-  useMessage,
   NSpin,
+  NEmpty,
+  NScrollbar,
+  useMessage,
 } from "naive-ui";
 import {
-  getRolesApi,
-  getPermissionsApi,
-  getRolePermissionsApi,
-  updateRolePermissionsApi,
+  getRoles,
+  getAllPermissions,
+  getRolePermissions,
+  updateRolePermissions,
 } from "@/api/admin";
 import type { Role, Permission } from "@/types/api";
 
 const message = useMessage();
+
+// State
 const loading = ref(true);
-const tabLoading = ref(false);
-
-const allRoles = ref<Role[]>([]);
+const saving = ref(false);
+const loadingPermissions = ref(false);
+const roles = ref<Role[]>([]);
 const allPermissions = ref<Permission[]>([]);
-const currentTab = ref<string | null>(null);
+const selectedRole = ref<Role | null>(null);
+const originalPermissionNames = ref<string[]>([]);
+const currentPermissionNames = ref<string[]>([]);
 
-// 使用一个对象来存储每个角色的权限状态
-const rolePermissions = ref<Record<string, Record<string, boolean>>>({});
-
-const activeRoleName = computed(() => {
-  if (!currentTab.value) return "";
-  const role = allRoles.value.find((r) => r.name === currentTab.value);
-  return role ? role.name : "";
-});
-
-const fetchInitialData = async () => {
-  loading.value = true;
+// 获取初始数据
+onMounted(async () => {
   try {
-    const [roles, permissions] = await Promise.all([getRolesApi(), getPermissionsApi()]);
-    // 过滤掉 SUPER 角色，因为它的权限是固定的
-    allRoles.value = roles.filter((r) => r.name !== "SUPER");
-    allPermissions.value = permissions;
-
-    // 初始化权限状态对象
-    const initialPerms: Record<string, Record<string, boolean>> = {};
-    allRoles.value.forEach((role) => {
-      initialPerms[role.name] = {};
-      permissions.forEach((perm) => {
-        initialPerms[role.name][perm.name] = false;
-      });
-    });
-    rolePermissions.value = initialPerms;
-
-    // 默认选中第一个角色标签页
-    if (allRoles.value.length > 0) {
-      currentTab.value = allRoles.value[0].name;
-      handleTabChange(allRoles.value[0].name);
+    loading.value = true;
+    const [rolesRes, permissionsRes] = await Promise.all([
+      getRoles(),
+      getAllPermissions(),
+    ]);
+    if (Array.isArray(rolesRes)) {
+      //从列表中筛选出SUPER角色
+      roles.value = rolesRes.filter((role) => role.name !== "SUPER");
+    }
+    if (Array.isArray(permissionsRes)) {
+      allPermissions.value = permissionsRes;
     }
   } catch (error) {
-    message.error("获取初始数据失败");
+    message.error("获取基础数据失败");
+    console.error(error);
   } finally {
     loading.value = false;
   }
+});
+
+// 方法
+const handleRoleSelect = async (role: Role) => {
+  selectedRole.value = role;
+  loadingPermissions.value = true;
+  currentPermissionNames.value = [];
+  try {
+    const rolePerms = await getRolePermissions(role.name);
+    const allowedPerms = rolePerms.filter((p) => p.allowed).map((p) => p.name);
+    currentPermissionNames.value = allowedPerms;
+    originalPermissionNames.value = [...allowedPerms];
+  } catch (error) {
+    message.error(`获取角色 '${role.name}' 的权限失败`);
+  } finally {
+    loadingPermissions.value = false;
+  }
 };
 
-const handleTabChange = async (tabName: string) => {
-  currentTab.value = tabName;
-  tabLoading.value = true;
-  try {
-    const rolePerms = await getRolePermissionsApi(tabName);
-
-    // 重置当前角色的权限
-    Object.keys(rolePermissions.value[tabName]).forEach((key) => {
-      rolePermissions.value[tabName][key] = false;
-    });
-
-    // 根据API返回的数据设置权限
-    rolePerms.forEach((p) => {
-      if (rolePermissions.value[tabName].hasOwnProperty(p.name)) {
-        rolePermissions.value[tabName][p.name] = p.allowed;
-      }
-    });
-  } catch (error) {
-    message.error(`获取角色 ${tabName} 的权限失败`);
-  } finally {
-    tabLoading.value = false;
-  }
+const resetPermissions = () => {
+  currentPermissionNames.value = [...originalPermissionNames.value];
+  message.info("权限已重置");
 };
 
 const handleSave = async () => {
-  if (!currentTab.value) return;
-  tabLoading.value = true;
+  if (!selectedRole.value) {
+    message.warning("没有选中的角色");
+    return;
+  }
+  saving.value = true;
   try {
-    const permissionsToSave = Object.entries(rolePermissions.value[currentTab.value]).map(
-      ([name, allowed]) => ({
-        name,
-        allowed,
-      })
-    );
-    await updateRolePermissionsApi(currentTab.value, permissionsToSave);
-    message.success(`角色 ${currentTab.value} 的权限已更新`);
+    const permissionsPayload = currentPermissionNames.value.map((name) => ({ name }));
+    await updateRolePermissions(selectedRole.value.name, permissionsPayload);
+    message.success(`角色 '${selectedRole.value.name}' 的权限更新成功`);
+    originalPermissionNames.value = [...currentPermissionNames.value];
   } catch (error) {
-    message.error("保存权限失败");
+    message.error("保存失败，请重试");
+    console.error(error);
   } finally {
-    tabLoading.value = false;
+    saving.value = false;
   }
 };
-
-onMounted(fetchInitialData);
 </script>
 
-<template>
-  <n-card title="角色权限管理">
-    <n-spin :show="loading">
-      <n-tabs type="card" v-model:value="currentTab" @update:value="handleTabChange">
-        <n-tab-pane
-          v-for="role in allRoles"
-          :key="role.value"
-          :name="role.name"
-          :tab="role.name"
-        >
-          <n-spin :show="tabLoading">
-            <n-space vertical class="p-4">
-              <div v-for="perm in allPermissions" :key="perm.id">
-                <n-checkbox v-model:checked="rolePermissions[role.name][perm.name]">
-                  {{ perm.description }} ({{ perm.name }})
-                </n-checkbox>
-              </div>
-              <n-button type="primary" @click="handleSave">保存当前角色权限</n-button>
-            </n-space>
-          </n-spin>
-        </n-tab-pane>
-      </n-tabs>
-    </n-spin>
-  </n-card>
-</template>
+<style scoped>
+.bg-blue-100 {
+  background-color: #ebf8ff;
+}
+.dark .bg-blue-900 {
+  background-color: #2c5282;
+}
+</style>
