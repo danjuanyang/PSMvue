@@ -62,9 +62,9 @@ const userStore = useUserStore();
 
 const activeMenu = computed(() => route.name as string);
 
-// **关键修改**: 将 menuOptions 转换为 computed 属性
 const menuOptions = computed<MenuOption[]>(() => {
-  const isAdmin = userStore.userRole === "ADMIN" || userStore.userRole === "SUPER";
+  const userRole = userStore.userRole;
+  const isAdminOrSuper = userRole === "ADMIN" || userRole === "SUPER";
 
   const baseItems: MenuOption[] = [
     {
@@ -72,6 +72,17 @@ const menuOptions = computed<MenuOption[]>(() => {
         h(RouterLink, { to: { name: "dashboard" } }, { default: () => "仪表盘" }),
       key: "dashboard",
     },
+    // --- 新增项目管理菜单 ---
+    {
+      label: () =>
+        h(
+          RouterLink,
+          { to: { name: "project-management" } },
+          { default: () => "项目管理" }
+        ),
+      key: "project-management",
+    },
+    // ------------------------
   ];
 
   const adminItems: MenuOption[] = [
@@ -101,7 +112,7 @@ const menuOptions = computed<MenuOption[]>(() => {
     },
   ];
 
-  if (isAdmin) {
+  if (isAdminOrSuper) {
     return [...baseItems, ...adminItems];
   }
 
@@ -113,7 +124,3 @@ const logout = () => {
   router.push("/auth/login");
 };
 </script>
-
-<style scoped>
-/* 无需特定样式，因为n-layout可以处理所有内容 */
-</style>

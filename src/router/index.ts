@@ -1,3 +1,4 @@
+// src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import MainLayout from '@/layouts/MainLayout.vue'
 import AuthLayout from '@/layouts/AuthLayout.vue'
@@ -19,6 +20,14 @@ const router = createRouter({
           name: 'dashboard',
           component: () => import('@/views/dashboard/index.vue')
         },
+        // --- 新增项目管理路由 ---
+        {
+          path: 'project-management',
+          name: 'project-management',
+          component: () => import('@/views/project/ProjectManagement.vue'),
+          meta: { requiresAuth: true, requiredPermissions: ['manage_projects'] } // 可选：添加权限元数据
+        },
+        // -------------------------
         {
           path: 'admin/user-management',
           name: 'user-management',
@@ -60,24 +69,19 @@ router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore();
 
   if (to.meta.requiresAuth) {
-    //如果用户未登录，请重定向到登录
     if (!userStore.isLoggedIn) {
       return next({ name: 'login' });
     }
 
-    //如果用户已登录但没有用户信息，请获取它
     if (!userStore.userInfo) {
       try {
         await userStore.fetchUserInfo();
       } catch (error) {
-        //如果获取失败（例如，令牌过期），请重定向到登录
         return next({ name: 'login' });
       }
     }
-    //有了用户信息，继续
     next();
   } else {
-    //对于公共路线，请继续
     next();
   }
 });

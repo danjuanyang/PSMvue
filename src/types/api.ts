@@ -1,3 +1,5 @@
+// src/types/api.ts
+
 /**
  * 通用API响应结构
  */
@@ -52,4 +54,65 @@ export interface User {
   username: string;
   email: string;
   role: string;
+}
+
+// --- 新增类型定义 ---
+
+export enum StatusEnum {
+  PENDING = 'PENDING',
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
+export interface Project {
+  id: number;
+  name: string;
+  description?: string;
+  employee_id?: number;
+  employee_name?: string;
+  start_date?: string;
+  deadline?: string;
+  progress: number;
+  status: StatusEnum;
+  subproject_count: number;
+}
+
+export interface Subproject {
+  id: number;
+  project_id: number;
+  name: string;
+  description?: string;
+  employee_id?: number;
+  employee_name?: string;
+  start_date?: string;
+  deadline?: string;
+  progress: number;
+  status: StatusEnum;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectStage {
+  id: number;
+  project_id: number;
+  subproject_id: number;
+  name: string;
+  description?: string;
+  start_date?: string;
+  end_date?: string;
+  progress: number;
+  status: StatusEnum;
+}
+
+export interface StageTask {
+  id: number;
+  stage_id: number;
+  name: string;
+  description?: string;
+  due_date?: string;
+  progress: number;
+  status: StatusEnum;
+  created_at: string;
+  updated_at: string;
 }
