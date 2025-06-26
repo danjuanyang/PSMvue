@@ -1,5 +1,3 @@
-// src/types/api.ts
-
 /**
  * 通用API响应结构
  */
@@ -10,7 +8,7 @@ export interface ApiResponse<T = any> {
 }
 
 /**
- * 用户信息
+ * 完整用户信息
  */
 export interface UserInfo {
   id: number
@@ -18,11 +16,8 @@ export interface UserInfo {
   email: string
   role: string
   avatar_url?: string
-  created_at: string
-  // 用户的特定权限
   specific_permissions: { name: string; allowed: boolean }[]
 }
-
 
 /**
  * 登录数据
@@ -42,7 +37,7 @@ export interface Permission {
 }
 
 /**
- * 角色定义 (来自后端的 RoleEnum)
+ * 角色定义
  */
 export interface Role {
   name: string;
@@ -50,13 +45,11 @@ export interface Role {
 }
 
 /**
- * 用户列表项（简化版）
+ * 用户列表项（与后端完全对应）
  */
 export interface User {
   id: number;
   username: string;
   email: string;
   role: string;
-  // 添加一个可选字段来持有用户的特定权限
-  specific_permissions?: { name: string; allowed: boolean }[];
 }

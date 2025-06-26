@@ -60,24 +60,24 @@ router.beforeEach(async (to, from, next) => {
   const userStore = useUserStore();
 
   if (to.meta.requiresAuth) {
-    // If user is not logged in, redirect to login
+    //如果用户未登录，请重定向到登录
     if (!userStore.isLoggedIn) {
       return next({ name: 'login' });
     }
 
-    // If user is logged in but has no user info, fetch it
+    //如果用户已登录但没有用户信息，请获取它
     if (!userStore.userInfo) {
       try {
         await userStore.fetchUserInfo();
       } catch (error) {
-        // If fetching fails (e.g., token expired), redirect to login
+        //如果获取失败（例如，令牌过期），请重定向到登录
         return next({ name: 'login' });
       }
     }
-    // Now that we have user info, proceed
+    //有了用户信息，继续
     next();
   } else {
-    // For public routes, just proceed
+    //对于公共路线，请继续
     next();
   }
 });
