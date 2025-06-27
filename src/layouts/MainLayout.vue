@@ -112,8 +112,15 @@ const menuOptions = computed<MenuOption[]>(() => {
     },
   ];
 
+  // HR 模块菜单
+  const hrItem: MenuOption = {
+    label: () =>
+      h(RouterLink, { to: { name: "human-resources" } }, { default: () => "人力资源" }),
+    key: "human-resources",
+  };
+
   if (isAdminOrSuper) {
-    return [...baseItems, ...adminItems];
+    return [...baseItems, ...adminItems, hrItem];
   }
 
   return baseItems;

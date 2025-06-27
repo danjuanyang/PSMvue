@@ -17,6 +17,7 @@
     </n-card>
   </div>
 
+  <!-- 创建/编辑项目 Modal -->
   <n-modal
     v-model:show="showModal"
     preset="card"
@@ -34,16 +35,17 @@
           placeholder="请输入项目描述"
         />
       </n-form-item>
-      <n-form-item path="employee_id" label="项目负责人">
+      <n-form-item path="employee_id" label="项目负责人 (组长)">
         <n-select
           v-model:value="currentProject.employee_id"
-          :options="assignableUsers"
+          :options="leaderOptions"
           placeholder="请选择负责人"
           filterable
+          clearable
         />
       </n-form-item>
       <n-form-item label="起止日期">
-        <n-date-picker v-model:formatted-value="dateRange" type="daterange" clearable />
+        <n-date-picker v-model:value="dateRange" type="daterange" clearable />
       </n-form-item>
       <n-form-item path="status" label="状态">
         <n-select v-model:value="currentProject.status" :options="statusOptions" />
@@ -62,6 +64,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, h, computed } from "vue";
+import { useRouter } from "vue-router";
 import {
   NButton,
   NDataTable,
@@ -80,19 +83,25 @@ import {
 } from "naive-ui";
 import type { DataTableColumns, FormInst } from "naive-ui";
 import { useUserStore } from "@/stores/user";
-import { getProjects, createProject, updateProject, deleteProject } from "@/api/project";
-import { getAllUsers } from "@/api/admin";
+import {
+  getProjects,
+  createProject,
+  updateProject,
+  deleteProject,
+  getUsersByRole,
+} from "@/api/project";
 import type { Project, User } from "@/types/api";
 import { StatusEnum } from "@/types/api";
 
 const message = useMessage();
 const userStore = useUserStore();
+const router = useRouter();
 
 // State
 const loading = ref(true);
 const saving = ref(false);
 const projects = ref<Project[]>([]);
-const allUsers = ref<User[]>([]);
+const leaders = ref<Partial<User>[]>([]);
 const pagination = { pageSize: 10 };
 
 // Modal
@@ -106,11 +115,9 @@ const modalTitle = computed(() => (isEditing.value ? "编辑项目" : "创建新
 const canCreateProject = computed(() =>
   ["SUPER", "ADMIN"].includes(userStore.userRole ?? "")
 );
-
-const assignableUsers = computed(() =>
-  allUsers.value.map((user) => ({ label: user.username, value: user.id }))
+const leaderOptions = computed(() =>
+  leaders.value.map((user) => ({ label: user.username, value: user.id }))
 );
-
 const statusOptions = Object.values(StatusEnum).map((s) => ({ label: s, value: s }));
 
 const dateRange = computed({
@@ -125,8 +132,8 @@ const dateRange = computed({
   },
   set: (val) => {
     if (val) {
-      currentProject.value.start_date = new Date(val[0]).toISOString();
-      currentProject.value.deadline = new Date(val[1]).toISOString();
+      currentProject.value.start_date = new Date(val[0]).toISOString().split("T")[0];
+      currentProject.value.deadline = new Date(val[1]).toISOString().split("T")[0];
     } else {
       currentProject.value.start_date = undefined;
       currentProject.value.deadline = undefined;
@@ -135,15 +142,21 @@ const dateRange = computed({
 });
 
 // Functions
-const fetchData = async () => {
+const fetchInitialData = async () => {
   loading.value = true;
   try {
-    const [projectRes, userRes] = await Promise.all([getProjects(), getAllUsers()]);
+    const promises = [getProjects()];
+    if (canCreateProject.value) {
+      promises.push(getUsersByRole("LEADER"));
+    }
+
+    const [projectRes, leaderRes] = await Promise.all(promises);
     projects.value = projectRes;
-    if (userRes && userRes.users) {
-      allUsers.value = userRes.users;
+    if (leaderRes) {
+      leaders.value = leaderRes;
     }
   } catch (error) {
+    console.error("Failed to fetch data:", error);
     message.error("获取数据失败");
   } finally {
     loading.value = false;
@@ -180,9 +193,9 @@ const handleSave = () => {
           message.success("创建成功");
         }
         showModal.value = false;
-        fetchData();
-      } catch (err) {
-        message.error("保存失败");
+        fetchInitialData();
+      } catch (err: any) {
+        message.error(err.response?.data?.error || "保存失败");
       } finally {
         saving.value = false;
       }
@@ -194,22 +207,33 @@ const handleDelete = async (id: number) => {
   try {
     await deleteProject(id);
     message.success("删除成功");
-    fetchData();
+    fetchInitialData();
   } catch (err) {
     message.error("删除失败");
   }
 };
 
+const viewProjectDetails = (projectId: number) => {
+  router.push({ name: "project-detail", params: { id: projectId } });
+};
+
 // DataTable Columns
 const columns: DataTableColumns<Project> = [
-  { title: "ID", key: "id", width: 60 },
+  { title: "ID", key: "id", width: 60, sorter: "default" },
   { title: "项目名称", key: "name", sorter: "default" },
-  { title: "负责人", key: "employee_name", width: 100 },
-  { title: "进度", key: "progress", render: (row) => `${row.progress}%`, width: 80 },
+  { title: "负责人", key: "employee_name", width: 100, sorter: "default" },
+  {
+    title: "进度",
+    key: "progress",
+    width: 80,
+    render: (row) => `${row.progress}%`,
+    sorter: (a, b) => a.progress - b.progress,
+  },
   {
     title: "状态",
     key: "status",
     width: 120,
+    sorter: (a, b) => a.status.localeCompare(b.status),
     render(row) {
       const type = {
         PENDING: "default",
@@ -224,26 +248,36 @@ const columns: DataTableColumns<Project> = [
       );
     },
   },
-  { title: "子项目数", key: "subproject_count", width: 100 },
+  {
+    title: "子项目数",
+    key: "subproject_count",
+    width: 100,
+    sorter: (a, b) => a.subproject_count - b.subproject_count,
+  },
   {
     title: "操作",
     key: "actions",
-    width: 180,
+    width: 220,
     fixed: "right",
     render(row) {
-      const canManage =
-        ["SUPER", "ADMIN"].includes(userStore.userRole ?? "") ||
-        userStore.userInfo?.id === row.employee_id;
-      if (!canManage) return null;
+      const isAdmin = ["SUPER", "ADMIN"].includes(userStore.userRole ?? "");
+      const isLeader =
+        userStore.userRole === "LEADER" && userStore.userInfo?.id === row.employee_id;
 
-      return h(NSpace, null, {
-        default: () => [
-          h(
+      const viewBtn = h(
+        NButton,
+        { size: "small", type: "info", onClick: () => viewProjectDetails(row.id) },
+        { default: () => "查看详情" }
+      );
+      const editBtn = isAdmin
+        ? h(
             NButton,
             { size: "small", onClick: () => openEditModal(row) },
             { default: () => "编辑" }
-          ),
-          h(
+          )
+        : null;
+      const deleteBtn = isAdmin
+        ? h(
             NPopconfirm,
             { onPositiveClick: () => handleDelete(row.id) },
             {
@@ -253,11 +287,13 @@ const columns: DataTableColumns<Project> = [
                   { size: "small", type: "error", ghost: true },
                   { default: () => "删除" }
                 ),
-              default: () =>
-                "确定要删除这个项目吗？所有相关子项目、阶段和任务都会被删除。",
+              default: () => "确定要删除这个项目吗？",
             }
-          ),
-        ],
+          )
+        : null;
+
+      return h(NSpace, null, {
+        default: () => [viewBtn, editBtn, deleteBtn].filter(Boolean),
       });
     },
   },
@@ -268,5 +304,5 @@ const rules = {
   status: { required: true, message: "请选择状态", trigger: "change" },
 };
 
-onMounted(fetchData);
+onMounted(fetchInitialData);
 </script>

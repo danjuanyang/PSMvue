@@ -116,3 +116,51 @@ export interface StageTask {
   created_at: string;
   updated_at: string;
 }
+
+// --- 新增HR模块类型定义 ---
+
+/**
+ * 带有组长信息的用户对象
+ */
+export interface UserWithLeader extends User {
+  team_leader_id: number | null;
+  leader_name: string | null;
+}
+
+/**
+ * 补卡记录
+ */
+export interface ClockInRecord {
+  id: number;
+  report_id: number;
+  employee_id: number;
+  employee_name: string;
+  clockin_date: string;
+  weekday: string;
+  remarks: string;
+  created_at: string;
+}
+
+/**
+ * 任务进度更新记录中内嵌的任务信息
+ */
+interface TaskInfo {
+  id: number;
+  name: string;
+  stage: string;
+  subproject: string;
+  project: string;
+}
+
+/**
+ * 任务进度更新记录
+ */
+export interface ProgressUpdateRecord {
+  id: number;
+  progress: number;
+  description: string;
+  created_at: string;
+  recorder_id: number;
+  recorder_name: string;
+  task_info: TaskInfo;
+}

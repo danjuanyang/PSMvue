@@ -15,29 +15,44 @@ const router = createRouter({
           path: '',
           redirect: { name: 'dashboard' }
         },
+        // --- 项目管理主面板 ---
         {
           path: 'dashboard',
           name: 'dashboard',
           component: () => import('@/views/dashboard/index.vue')
         },
-        // --- 新增项目管理路由 ---
+        // ---人力资源---
+        {
+          path: 'hr',
+          name: 'human-resources',
+          component: () => import('@/views/hr/HumanResources.vue'),
+          meta: { requiresAuth: true, requiredRoles: ['SUPER', 'ADMIN'] } // 权限控制
+        },
+        // --- 项目管理路由 ---
         {
           path: 'project-management',
           name: 'project-management',
           component: () => import('@/views/project/ProjectManagement.vue'),
           meta: { requiresAuth: true, requiredPermissions: ['manage_projects'] } // 可选：添加权限元数据
         },
-        // -------------------------
+        // --- 项目详情路由 ---
         {
           path: 'admin/user-management',
           name: 'user-management',
           component: () => import('@/views/admin/UserManagement.vue')
         },
         {
+          path: 'project/:id',
+          name: 'project-detail',
+          component: () => import('@/views/project/ProjectDetail.vue'),
+          meta: { requiresAuth: true }
+        },
+        // --- 角色管理路由 ---
+        {
           path: 'admin/role-management',
           name: 'role-management',
           component: () => import('@/views/admin/RoleManagement.vue')
-        }
+        },
       ],
       meta: { requiresAuth: true }
     },

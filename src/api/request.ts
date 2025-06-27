@@ -1,3 +1,4 @@
+// src/api/request.ts
 import axios from 'axios'
 import { useMessage } from 'naive-ui'
 import { useUserStore } from '@/stores/user'
@@ -5,7 +6,7 @@ import { useUserStore } from '@/stores/user'
 const service = axios.create({
   // **关键修改**: baseURL 指向代理
   baseURL: '/api',
-  timeout: 5000,
+  timeout: 5173,
 })
 
 // 请求拦截器
@@ -22,7 +23,7 @@ service.interceptors.request.use(
   }
 )
 
-// 响应拦截器 (简化版，你可以根据需要扩展)
+// 响应拦截器
 service.interceptors.response.use(
   (response) => {
     // 直接返回响应体中的 data 部分
