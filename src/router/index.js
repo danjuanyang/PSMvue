@@ -10,18 +10,52 @@ import {
 const routes = [{
         path: '/login',
         name: 'Login',
-
-        component: () => import( /* webpackChunkName: "login" */ '../views/login/LoginView.vue')
+        component: () => import('../views/login/LoginView.vue')
     },
     {
         path: '/',
         name: 'Dashboard',
-
-        component: () => import( /* webpackChunkName: "dashboard" */ '../views/dashboard/DashboardView.vue'),
+        component: () => import('../views/dashboard/DashboardView.vue'),
         meta: {
             requiresAuth: true
         }
     },
+    {
+        path: '/admin/permissions',
+        name: 'PermissionManagement',
+        component: () => import('../views/admin/PermissionManagement.vue'),
+        meta: {
+            requiresAuth: true
+        },
+        beforeEnter: (to, from, next) => {
+            const userRole = store.getters['user/userRole'];
+            if (userRole === 'SUPER' || userRole === 'ADMIN') {
+                next();
+            } else {
+                message.error('您没有权限访问此页面');
+                next({
+                    name: 'Dashboard'
+                });
+            }
+        }
+    },
+    {
+        path: '/projects',
+        name: 'ProjectList',
+        component: () => import('../views/project/ProjectList.vue'),
+        meta: {
+            requiresAuth: true
+        }
+    },
+    // --- 新增项目详情动态路由 ---
+    {
+        path: '/projects/:id',
+        name: 'ProjectDetail',
+        component: () => import('../views/project/ProjectDetail.vue'),
+        meta: {
+            requiresAuth: true
+        }
+    }
 ];
 
 const router = createRouter({
@@ -29,7 +63,7 @@ const router = createRouter({
     routes
 });
 
-// The router guard remains the same
+// 全局路由守卫保持不变
 router.beforeEach(async (to, from, next) => {
     if (to.meta.requiresAuth) {
         let isLoggedIn = store.getters['user/isLoggedIn'];
