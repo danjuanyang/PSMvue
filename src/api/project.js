@@ -143,6 +143,20 @@ export function createStage(subprojectId, stageData) {
 }
 
 /**
+ * 更新一个阶段
+ * @param {number} stageId
+ * @param {object} stageData
+ */
+export function updateStage(stageId, stageData) {
+    return request({
+        url: `/project/stages/${stageId}`,
+        method: 'put',
+        data: stageData
+    });
+}
+
+
+/**
  * 删除一个阶段
  * @param {number} stageId
  */
@@ -167,6 +181,20 @@ export function createTask(stageId, taskData) {
 }
 
 /**
+ * 更新一个任务
+ * @param {number} taskId
+ * @param {object} taskData
+ */
+export function updateTask(taskId, taskData) {
+    return request({
+        url: `/project/tasks/${taskId}`,
+        method: 'put',
+        data: taskData
+    });
+}
+
+
+/**
  * 更新任务进度
  * @param {number} taskId
  * @param {object} progressData { progress, description }
@@ -189,6 +217,24 @@ export function deleteTask(taskId) {
         method: 'delete'
     });
 }
+
+/**
+ * 为任务上传文件
+ * @param {number} taskId
+ * @param {FormData} formData
+ */
+export function uploadFileForTask(taskId, formData) {
+    return request({
+        url: `/files/tasks/${taskId}/upload`,
+        method: 'post',
+        data: formData,
+        headers: {
+            'Content-Type': 'multipart/form-data'
+        }
+    });
+}
+
+
 
 
 // =========================================================================

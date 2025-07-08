@@ -223,17 +223,27 @@ const columns = [
   { title: "操作", key: "action", width: "250px" },
 ];
 
-const getStatusColor = (status) =>
-  ({
+const getStatusText = (status) => {
+  if (!status) return "未知";
+  const texts = {
+    IN_PROGRESS: "进行中",
+    COMPLETED: "已完成",
+    PENDING: "未开始",
+    PAUSED: "已暂停",
+  };
+  return texts[status.toUpperCase()] || "未知";
+};
+
+const getStatusColor = (status) => {
+  if (!status) return "default";
+  const colors = {
     IN_PROGRESS: "processing",
     COMPLETED: "success",
     PENDING: "default",
     PAUSED: "warning",
-  }[status] || "default");
-const getStatusText = (status) =>
-  ({ IN_PROGRESS: "进行中", COMPLETED: "已完成", PENDING: "未开始", PAUSED: "已暂停" }[
-    status
-  ] || "未知");
+  };
+  return colors[status.toUpperCase()] || "default";
+};
 </script>
 
 <style scoped>
