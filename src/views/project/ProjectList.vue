@@ -58,7 +58,9 @@
         >
           <a-input v-model:value="formState.name" />
         </a-form-item>
-        <a-form-item name="description" label="项目描述">
+        <a-form-item name="description" label="项目描述"
+        :rules="[{ required: true, message: '请输入项目名称' }]"
+        >
           <a-textarea v-model:value="formState.description" :rows="4" />
         </a-form-item>
         <a-form-item name="employee_id" label="项目负责人 (组长)">

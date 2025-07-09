@@ -228,9 +228,17 @@ export function uploadFileForTask(taskId, formData) {
         url: `/files/tasks/${taskId}/upload`,
         method: 'post',
         data: formData,
-        headers: {
-            'Content-Type': 'multipart/form-data'
-        }
+    });
+}
+
+/**
+ * 获取指定任务已上传的文件列表
+ * @param {number} taskId
+ */
+export function getTaskFiles(taskId) {
+    return request({
+        url: `/files/tasks/${taskId}/files`,
+        method: 'get'
     });
 }
 

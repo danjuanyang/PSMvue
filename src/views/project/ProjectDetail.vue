@@ -45,6 +45,7 @@
           >
             <template #extra>
               <a-space>
+                <!-- 关键修复：使用后端返回的 member_names 字段 -->
                 <a-tag>负责人: {{ subproject.member_names || "未分配" }}</a-tag>
                 <a-progress type="circle" :percent="subproject.progress" :width="35" />
                 <a-button
@@ -96,7 +97,7 @@
                           title="更新进度"
                           trigger="click"
                           @openChange="(v) => onProgressPopoverOpen(v, item)"
-                          v-if="item.status !== 'COMPLETED'"
+                          v-if="item.status !== 'completed'"
                         >
                           <template #content>
                             <a-slider
@@ -121,9 +122,9 @@
                           <a-button type="link" size="small">更新进度</a-button>
                         </a-popover>
 
-                        <!--  根据任务状态切换按钮 -->
+                        <!-- 修复 #2: 根据任务状态切换按钮 -->
                         <a-button
-                          v-if="item.status === 'COMPLETED'"
+                          v-if="item.status === 'completed'"
                           type="link"
                           @click="openUploadModal(item)"
                           ><UploadOutlined /> 上传</a-button
@@ -168,10 +169,12 @@
           <a-form-item name="description" label="描述" :rules="[{ required: true }]"
             ><a-textarea v-model:value="subprojectFormState.description"
           /></a-form-item>
+          <!--应用中文语言包 -->
           <a-form-item name="dateRange" label="起止日期" :rules="[{ required: true }]"
             ><a-range-picker
               v-model:value="subprojectFormState.dateRange"
               :disabled-date="disabledSubprojectDate"
+              :locale="locale"
               style="width: 100%"
           /></a-form-item>
         </template>
@@ -196,8 +199,12 @@
         <a-form-item name="description" label="描述" :rules="[{ required: true }]"
           ><a-textarea v-model:value="stageFormState.description"
         /></a-form-item>
+        <!--应用中文语言包 -->
         <a-form-item name="dateRange" label="起止日期" :rules="[{ required: true }]"
-          ><a-range-picker v-model:value="stageFormState.dateRange" style="width: 100%"
+          ><a-range-picker
+            v-model:value="stageFormState.dateRange"
+            :locale="locale"
+            style="width: 100%"
         /></a-form-item>
       </a-form>
     </a-modal>
@@ -210,10 +217,12 @@
         <a-form-item name="description" label="任务描述" :rules="[{ required: true }]"
           ><a-textarea v-model:value="taskFormState.description" :disabled="isEditMode"
         /></a-form-item>
+        <!-- 应用中文语言包 -->
         <a-form-item name="due_date" label="截止日期" :rules="[{ required: true }]"
           ><a-date-picker
             v-model:value="taskFormState.due_date"
             :disabled-date="disabledTaskDate"
+            :locale="locale"
             style="width: 100%"
         /></a-form-item>
       </a-form>
@@ -229,11 +238,37 @@
         v-model:fileList="fileList"
         name="file"
         :before-upload="() => false"
-        @change="handleFileChange"
       >
         <p class="ant-upload-drag-icon"><InboxOutlined /></p>
         <p class="ant-upload-text">点击或拖拽文件到此区域上传</p>
       </a-upload-dragger>
+
+      <a-divider>已上传文件</a-divider>
+      <a-list
+        :loading="taskFilesLoading"
+        item-layout="horizontal"
+        :data-source="taskFiles"
+      >
+        <template #renderItem="{ item }">
+          <a-list-item>
+            <a-list-item-meta
+              :title="item.original_name"
+              :description="`上传者: ${item.uploader_name} | 时间: ${dayjs(
+                item.upload_date
+              ).format('YYYY-MM-DD HH:mm')}`"
+            >
+              <template #avatar>
+                <a-avatar style="background-color: #1890ff"
+                  ><PaperClipOutlined
+                /></a-avatar>
+              </template>
+            </a-list-item-meta>
+          </a-list-item>
+        </template>
+        <template #empty v-if="!taskFilesLoading">
+          <a-empty description="该任务暂无已上传文件" />
+        </template>
+      </a-list>
     </a-modal>
   </div>
 </template>
@@ -256,6 +291,7 @@ import {
   updateTask,
   uploadFileForTask,
   getUsersByRole,
+  getTaskFiles
 } from "@/api/project";
 
 import { message } from "ant-design-vue";
@@ -266,7 +302,7 @@ import {
   InboxOutlined,
 } from "@ant-design/icons-vue";
 import dayjs from "dayjs";
-// import locale from "ant-design-vue/es/date-picker/locale/zh_CN"; // 导入日期组件的中文包
+import locale from "ant-design-vue/es/date-picker/locale/zh_CN"; // 导入日期组件的中文包
 
 // --- State & Hooks ---
 const store = useStore();
@@ -298,6 +334,8 @@ const isUploadModalVisible = ref(false);
 const currentTaskForUpload = ref(null);
 const fileList = ref([]);
 const uploading = ref(false);
+const taskFiles = ref([]); // 新增：用于存储已上传文件
+const taskFilesLoading = ref(false); // 新增：列表加载状态
 
 // --- Computed ---
 const user = computed(() => store.getters["user/currentUser"]);
@@ -401,10 +439,21 @@ const openEditTaskModal = (task, stage) => {
   };
   isTaskModalVisible.value = true;
 };
-const openUploadModal = (task) => {
+const openUploadModal = async (task) => {
   currentTaskForUpload.value = task;
   isUploadModalVisible.value = true;
-  fileList.value = [];
+  fileList.value = []; // 清空待上传列表
+
+  // 加载已有文件列表
+  taskFilesLoading.value = true;
+  try {
+    taskFiles.value = await getTaskFiles(task.id);
+  } catch (error) {
+    message.error("加载已上传文件列表失败");
+    taskFiles.value = [];
+  } finally {
+    taskFilesLoading.value = false;
+  }
 };
 
 // --- Modal Handlers ---
@@ -473,12 +522,21 @@ const handleTaskOk = async () => {
 };
 
 const handleUpload = async () => {
-  if (fileList.value.length === 0) {
-    message.error("请选择文件");
+  // 1. 检查 fileList 是否为空
+  if (!fileList.value || fileList.value.length === 0) {
+    message.error("请选择一个文件！");
+    return;
+  }
+  // Ant Design 的 v-model:fileList 数组中的每个对象都包含 originFileObj
+  const fileToUpload = fileList.value[0]?.originFileObj;
+  // 3. 再次检查是否成功获取文件
+  if (!fileToUpload) {
+    message.error("无法获取文件，请重新选择。");
     return;
   }
   const formData = new FormData();
-  formData.append("file", fileList.value[0].originFileObj);
+  formData.append("file", fileToUpload);
+
   uploading.value = true;
   try {
     await uploadFileForTask(currentTaskForUpload.value.id, formData);
@@ -489,9 +547,6 @@ const handleUpload = async () => {
   } finally {
     uploading.value = false;
   }
-};
-const handleFileChange = (info) => {
-  fileList.value = [info.file];
 };
 
 const onProgressPopoverOpen = (visible, task) => {

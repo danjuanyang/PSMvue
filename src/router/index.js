@@ -55,7 +55,17 @@ const routes = [{
         meta: {
             requiresAuth: true
         }
-    }
+    },
+    // --- 新增公告路由 ---
+    {
+        path: '/announcements',
+        name: 'Announcement',
+        component: () => import('../views/announcement/AnnouncementView.vue'),
+        meta: {
+            requiresAuth: true
+        }
+    },
+    
 ];
 
 const router = createRouter({
