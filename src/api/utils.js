@@ -8,7 +8,6 @@
 export function getFilePreviewUrl(modelName, fileId) {
     // baseURL 在 vue.config.js 中被代理到后端服务器
     // 后端 utils 蓝图的 url_prefix 是 /api/utils
-    // 因此我们直接构建此路径
     return `/api/utils/preview/${modelName}/${fileId}`;
 }
   

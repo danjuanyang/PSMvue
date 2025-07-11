@@ -1,12 +1,14 @@
 import {
     login,
     logout,
-    getStatus
+    getStatus,
+    getMyPermissions
 } from '@/api/auth';
 
 const state = {
-    user: null, // 存储用户信息对象
-    isLoggedIn: false, // 标记登录状态
+    user: null,
+    isLoggedIn: false,
+    permissions: [], // 新增：用于存储权限列表
 };
 
 const mutations = {
@@ -16,41 +18,42 @@ const mutations = {
     SET_LOGGED_IN: (state, status) => {
         state.isLoggedIn = status;
     },
+    SET_PERMISSIONS: (state, permissions) => {
+        state.permissions = permissions;
+    },
     CLEAR_USER_DATA: (state) => {
         state.user = null;
         state.isLoggedIn = false;
+        state.permissions = []; // 登出时清空权限
     }
 };
 
 const actions = {
     // 用户登录 Action
     async login({
-        commit
+        commit,
+        dispatch
     }, userInfo) {
-        const {
-            username,
-            password
-        } = userInfo;
-        // 调用登录API
-        const response = await login({
-            username: username.trim(),
-            password: password
-        });
-        // 登录成功，提交mutation更新state
+        const response = await login(userInfo);
         commit('SET_USER', response.user);
         commit('SET_LOGGED_IN', true);
-        return response; // 返回响应给组件，以便组件进行后续操作（如跳转）
+        // 登录成功后，立即获取权限
+        await dispatch('getPermissions');
+        return response;
     },
 
     // 获取登录状态 Action
     async getStatus({
-        commit
+        commit,
+        dispatch
     }) {
         try {
             const response = await getStatus();
             if (response.logged_in) {
                 commit('SET_USER', response.user);
                 commit('SET_LOGGED_IN', true);
+                // 如果已登录，同样获取权限
+                await dispatch('getPermissions');
             } else {
                 commit('CLEAR_USER_DATA');
             }
@@ -61,6 +64,19 @@ const actions = {
         }
     },
 
+    // 新增：获取权限的 Action
+    async getPermissions({
+        commit
+    }) {
+        try {
+            const permissions = await getMyPermissions();
+            commit('SET_PERMISSIONS', permissions);
+        } catch (error) {
+            console.error("获取用户权限失败", error);
+            commit('SET_PERMISSIONS', []); // 失败则设置为空数组
+        }
+    },
+
     // 用户登出 Action
     async logout({
         commit
@@ -68,7 +84,6 @@ const actions = {
         try {
             await logout();
         } finally {
-            // 无论API调用成功与否，前端都清除用户数据
             commit('CLEAR_USER_DATA');
         }
     }
@@ -77,12 +92,19 @@ const actions = {
 const getters = {
     isLoggedIn: state => state.isLoggedIn,
     currentUser: state => state.user,
-    userRole: state => state.user ? state.user.role : ''
+    userRole: state => state.user ? state.user.role : '',
+    // 新增：权限检查 Getter
+    hasPermission: (state) => (permissionName) => {
+        // SUPER 用户永远返回 true
+        if (state.user && state.user.role === 'SUPER') {
+            return true;
+        }
+        return state.permissions.includes(permissionName);
+    }
 };
 
-
 export default {
-    namespaced: true, // 开启命名空间
+    namespaced: true,
     state,
     mutations,
     actions,

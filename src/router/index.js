@@ -25,19 +25,18 @@ const routes = [{
         name: 'PermissionManagement',
         component: () => import('../views/admin/PermissionManagement.vue'),
         meta: {
-            requiresAuth: true
-        },
-        beforeEnter: (to, from, next) => {
-            const userRole = store.getters['user/userRole'];
-            if (userRole === 'SUPER' || userRole === 'ADMIN') {
-                next();
-            } else {
-                message.error('您没有权限访问此页面');
-                next({
-                    name: 'Dashboard'
-                });
-            }
-        }
+            requiresAuth: true,
+            permission: 'manage_roles'
+        } // 使用权限元信息
+    },
+    {
+        path: '/hr/progress-report',
+        name: 'ProgressReport',
+        component: () => import('../views/hr/ProgressReport.vue'),
+        meta: {
+            requiresAuth: true,
+            permission: 'view_progress_reports'
+        } // 使用权限元信息
     },
     {
         path: '/projects',
@@ -65,7 +64,25 @@ const routes = [{
             requiresAuth: true
         }
     },
-    
+    // --- 新增HR路由 ---
+    {
+        path: '/hr/clock-in',
+        name: 'ClockInReport',
+        component: () => import('../views/hr/ClockInReport.vue'),
+        meta: {
+            requiresAuth: true
+        }
+    },
+    {
+        path: '/hr/progress-report',
+        name: 'ProgressReport',
+        component: () => import('../views/hr/ProgressReport.vue'),
+        meta: {
+            requiresAuth: true,
+            roles: ['SUPER', 'ADMIN']
+        } // 添加角色元信息
+    }
+
 ];
 
 const router = createRouter({
@@ -75,25 +92,31 @@ const router = createRouter({
 
 // 全局路由守卫保持不变
 router.beforeEach(async (to, from, next) => {
+    let isLoggedIn = store.getters['user/isLoggedIn'];
+    if (!isLoggedIn && localStorage.getItem('isLoggedIn') === 'true') { // 简单的持久化检查
+        await store.dispatch('user/getStatus');
+        isLoggedIn = store.getters['user/isLoggedIn'];
+    }
+
     if (to.meta.requiresAuth) {
-        let isLoggedIn = store.getters['user/isLoggedIn'];
         if (!isLoggedIn) {
-            isLoggedIn = await store.dispatch('user/getStatus');
-        }
-        if (isLoggedIn) {
-            next();
-        } else {
             message.warn('请先登录！');
-            next({
+            return next({
                 path: '/login',
                 query: {
                     redirect: to.fullPath
                 }
             });
         }
-    } else {
-        next();
+        // 检查页面级权限
+        if (to.meta.permission && !store.getters['user/hasPermission'](to.meta.permission)) {
+            message.error('您没有权限访问此页面');
+            return next({
+                name: 'Dashboard'
+            });
+        }
     }
+    next();
 });
 
 export default router;

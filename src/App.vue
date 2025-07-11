@@ -23,9 +23,29 @@
           <span>系统公告</span>
         </a-menu-item>
 
+        <!-- 修改：所有角色都能看到HR菜单 -->
+
+        <a-sub-menu key="hr">
+          <template #title
+            ><span><solution-outlined /><span>人事/行政</span></span></template
+          >
+          <!-- 使用权限判断 -->
+          <a-menu-item
+            key="clock-in-report"
+            v-if="!hasPermission('view_clock_in_reports')"
+            >补卡填报</a-menu-item
+          >
+          <a-menu-item key="clock-in-stats" v-if="hasPermission('view_clock_in_reports')"
+            >补卡统计</a-menu-item
+          >
+          <a-menu-item key="progress-report" v-if="hasPermission('view_progress_reports')"
+            >进度报告</a-menu-item
+          >
+        </a-sub-menu>
+
         <a-menu-item
           key="permissions"
-          v-if="userRole === 'SUPER' || userRole === 'ADMIN'"
+          v-if="hasPermission('manage_roles') || hasPermission('manage_permissions')"
         >
           <setting-outlined />
           <span>权限管理</span>
@@ -85,7 +105,11 @@ const selectedKeys = ref(["dashboard"]);
 
 const isLoggedIn = computed(() => store.getters["user/isLoggedIn"]);
 const username = computed(() => store.getters["user/currentUser"]?.username || "用户");
-const userRole = computed(() => store.getters["user/userRole"]);
+// 添加权限判断
+const hasPermission = computed(() => store.getters['user/hasPermission']);
+const isAdmin = computed(() =>
+  ["SUPER", "ADMIN"].includes(store.getters["user/userRole"])
+);
 
 // 监听路由变化，更新菜单选中状态
 watch(
@@ -97,6 +121,10 @@ watch(
     else if (newRoute.name === "Announcement") selectedKeys.value = ["announcements"];
     else if (newRoute.name === "PermissionManagement")
       selectedKeys.value = ["permissions"];
+    else if (newRoute.name === "ClockInReport") {
+      selectedKeys.value = isAdmin.value ? ["clock-in-stats"] : ["clock-in-report"];
+      if (newRoute.name === "ProgressReport") selectedKeys.value = ["progress-report"];
+    }
   },
   { immediate: true }
 );
@@ -106,6 +134,10 @@ const handleMenuClick = (e) => {
   else if (e.key === "projects") router.push("/projects");
   else if (e.key === "announcements") router.push("/announcements");
   else if (e.key === "permissions") router.push("/admin/permissions");
+  else if (e.key === "clock-in-report" || e.key === "clock-in-stats") {
+    router.push("/hr/clock-in");
+  }
+  if (e.key === "progress-report") router.push("/hr/progress-report");
 };
 
 const handleLogout = async () => {

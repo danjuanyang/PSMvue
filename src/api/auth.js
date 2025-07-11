@@ -43,3 +43,15 @@ export function logout() {
         method: 'post'
     });
 }
+
+
+/**
+ * 获取当前登录用户的所有权限
+ */
+export function getMyPermissions() {
+    return request({
+        url: '/auth/my-permissions',
+        method: 'get',
+    });
+}
+  
