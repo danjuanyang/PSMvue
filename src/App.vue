@@ -106,7 +106,7 @@ const selectedKeys = ref(["dashboard"]);
 const isLoggedIn = computed(() => store.getters["user/isLoggedIn"]);
 const username = computed(() => store.getters["user/currentUser"]?.username || "用户");
 // 添加权限判断
-const hasPermission = computed(() => store.getters['user/hasPermission']);
+const hasPermission = computed(() => store.getters["user/hasPermission"]);
 const isAdmin = computed(() =>
   ["SUPER", "ADMIN"].includes(store.getters["user/userRole"])
 );
@@ -116,26 +116,28 @@ watch(
   route,
   (newRoute) => {
     if (newRoute.name === "Dashboard") selectedKeys.value = ["dashboard"];
-    else if (newRoute.name === "ProjectList" || newRoute.name === "ProjectDetail")
-      selectedKeys.value = ["projects"];
-    else if (newRoute.name === "Announcement") selectedKeys.value = ["announcements"];
-    else if (newRoute.name === "PermissionManagement")
-      selectedKeys.value = ["permissions"];
-    else if (newRoute.name === "ClockInReport") {
+    else if (newRoute.path.startsWith("/project")) selectedKeys.value = ["projects"];
+    else if (newRoute.path.startsWith("/announcement")) selectedKeys.value = ["announcements"];
+    else if (newRoute.path.startsWith("/admin")) selectedKeys.value = ["permissions"];
+    else if (newRoute.path.startsWith("/hr/clock-in")) {
       selectedKeys.value = isAdmin.value ? ["clock-in-stats"] : ["clock-in-report"];
-      if (newRoute.name === "ProgressReport") selectedKeys.value = ["progress-report"];
     }
+    else if (newRoute.path.startsWith("/hr/progress")) selectedKeys.value = ["progress-report"];
   },
   { immediate: true }
 );
 
+
 const handleMenuClick = (e) => {
   if (e.key === "dashboard") router.push("/");
-  else if (e.key === "projects") router.push("/projects");
-  else if (e.key === "announcements") router.push("/announcements");
-  else if (e.key === "permissions") router.push("/admin/permissions");
+  else if (e.key === "projects") router.push("/project/list");
+  // ✅ 修正路径
+  else if (e.key === "announcements") router.push("/announcement/index");
+  // ✅ 修正路径
+  else if (e.key === "permissions") router.push("/admin/permission-management");
+  // ✅ 修正路径
   else if (e.key === "clock-in-report" || e.key === "clock-in-stats") {
-    router.push("/hr/clock-in");
+    router.push("/hr/clock-in-report");
   }
   if (e.key === "progress-report") router.push("/hr/progress-report");
 };

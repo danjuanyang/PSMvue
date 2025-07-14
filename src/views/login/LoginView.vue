@@ -143,7 +143,7 @@ const registerFormState = reactive({
 // --- Methods ---
 const onLoginFinish = async (values) => {
     try {
-        // loginLoading.value = true
+        isLoading.value = true
         
         // 调用登录action
         await store.dispatch('user/login', {
@@ -153,16 +153,15 @@ const onLoginFinish = async (values) => {
         
         message.success('登录成功！')
         
-        // 获取重定向路径
-        const redirect = route.query.redirect || '/'
+        // 获取重定向路径 - 修复重定向逻辑
+        const redirect = route.query.redirect || '/dashboard'
         await router.push(redirect)
         
     } catch (error) {
         console.error('登录流程失败:', error)
-        // 显示具体错误信息
         message.error(error.message || '登录失败，请检查用户名和密码')
     } finally {
-        // loginLoading.value = false
+        isLoading.value = false
     }
 }
 

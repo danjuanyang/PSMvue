@@ -63,7 +63,7 @@
         >
           <a-textarea v-model:value="formState.description" :rows="4" />
         </a-form-item>
-        <a-form-item name="employee_id" label="项目负责人 (组长)">
+        <a-form-item name="employee_id" label="项目负责人 (组长)" :rules="[{ required: true, message: '请选择一个负责人' }]">
           <a-select
             v-model:value="formState.employee_id"
             placeholder="请选择一个负责人"
@@ -80,12 +80,12 @@
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item name="start_date" label="开始日期">
+            <a-form-item name="start_date" label="开始日期" :rules="[{ required: true, message: '请选择开始日期' }]" >
               <a-date-picker v-model:value="formState.start_date" style="width: 100%" />
             </a-form-item>
           </a-col>
           <a-col :span="12">
-            <a-form-item name="deadline" label="截止日期">
+            <a-form-item name="deadline" label="截止日期" :rules="[{ required: true, message: '请选择截止日期' }]">
               <a-date-picker v-model:value="formState.deadline" style="width: 100%" />
             </a-form-item>
           </a-col>
@@ -195,7 +195,7 @@ const handleModalOk = async () => {
     isModalVisible.value = false;
     fetchProjects();
   } catch (error) {
-    console.error("Form validation/submission failed:", error);
+    console.error("表单验证/提交失败：", error);
     message.error("操作失败，请检查表单内容");
   } finally {
     modalLoading.value = false;

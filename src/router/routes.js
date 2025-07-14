@@ -1,34 +1,26 @@
-/*
- * Layout 组件占位符
- * 这是一个用于防止应用报错的临时占位符。
- * 在实际应用中, 您必须创建一个真实的布局文件 (例如 `src/layout/index.vue`)。
- */
-const Layout = () => import('@/views/dashboard/DashboardView.vue'); // 假设 Layout 是 Dashboard 的一部分或一个独立的布局组件
+const Layout = () => import('@/layout/AppLayout.vue');
 
-/**
- * constantRoutes: 静态路由
- * 这些路由没有权限要求, 所有用户都可以访问。
- */
+// 路由配置保持不变
 export const constantRoutes = [{
-        path: '/login',
-        // 使用路由懒加载语法
-        component: () => import('@/views/login/LoginView.vue'),
-        hidden: true
-    },
-    {
-        path: '/',
-        component: Layout,
-        redirect: '/dashboard',
-        children: [{
-            path: 'dashboard',
-            name: 'Dashboard',
-            component: () => import('@/views/dashboard/DashboardView.vue'),
-            meta: {
-                title: '主页',
-                icon: 'dashboard'
-            }
-        }]
-    },
+            path: '/login',
+            name: 'Login',
+            component: () => import('@/views/login/LoginView.vue'),
+            hidden: true
+        },
+        {
+            path: '/',
+            component: Layout, // ✅ 使用重命名后的组件
+            redirect: '/dashboard',
+            children: [{
+                path: 'dashboard',
+                name: 'Dashboard',
+                component: () => import('@/views/dashboard/DashboardView.vue'),
+                meta: {
+                    title: '主页',
+                    icon: 'dashboard'
+                }
+            }]
+        },
     {
         path: '/project',
         component: Layout,

@@ -20,6 +20,7 @@ NProgress.configure({
 
 const whiteList = ['/login'] // 免登录白名单
 
+
 router.beforeEach(async (to, from, next) => {
     NProgress.start()
     document.title = to.meta.title || 'PSM System'
@@ -38,28 +39,22 @@ router.beforeEach(async (to, from, next) => {
         const hasUserInfo = store.getters.user && store.getters.user.id
 
         if (hasUserInfo) {
-            // ✅ 用户信息已存在，直接放行
             next()
         } else {
             try {
-                // 获取用户信息和权限
                 const {
                     roles,
                     permissions
                 } = await store.dispatch('user/getInfo')
-
-                // 生成并添加路由
                 const accessRoutes = await store.dispatch('permission/generateRoutes', {
                     roles,
                     permissions
                 })
 
-                // 动态添加路由
                 accessRoutes.forEach(route => {
                     router.addRoute(route)
                 })
 
-                // ✅ 关键修复：使用路径字符串而不是路由对象
                 if (to.path === '/') {
                     next('/dashboard')
                 } else {
@@ -67,7 +62,8 @@ router.beforeEach(async (to, from, next) => {
                 }
             } catch (error) {
                 await store.dispatch('user/logout')
-                message.error(error.message || 'Verification failed, please login again.')
+                message.error(error.message || '验证失败，请重新登录。')
+                // ✅ 修复：重定向到登录页而不是原路径
                 next(`/login?redirect=${to.path}`)
                 NProgress.done()
             }
@@ -76,11 +72,13 @@ router.beforeEach(async (to, from, next) => {
         if (whiteList.indexOf(to.path) !== -1) {
             next()
         } else {
+            // ✅ 关键修复：重定向到登录页面
             next(`/login?redirect=${to.path}`)
             NProgress.done()
         }
     }
 })
+
 
 
 
