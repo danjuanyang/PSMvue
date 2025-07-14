@@ -1,107 +1,162 @@
 import {
-    login,
-    logout,
-    getStatus,
-    getMyPermissions
-} from '@/api/auth';
+    login as loginApi,
+    logout as logoutApi,
+    getInfo as getInfoApi
+} from '@/api/auth'
+import {
+    getToken,
+    removeToken,
+    setToken
+} from '@/utils/auth'
+// 为了打破模块循环依赖，已从此文件顶部移除对 router 的任何导入
 
 const state = {
+    token: getToken(),
     user: null,
-    isLoggedIn: false,
-    permissions: [], // 新增：用于存储权限列表
-};
+    roles: [],
+    permissions: []
+}
 
 const mutations = {
-    SET_USER: (state, user) => {
-        state.user = user;
+    SET_TOKEN: (state, token) => {
+        state.token = token
     },
-    SET_LOGGED_IN: (state, status) => {
-        state.isLoggedIn = status;
+    SET_USER: (state, user) => {
+        state.user = user
+    },
+    SET_ROLES: (state, roles) => {
+        state.roles = roles
     },
     SET_PERMISSIONS: (state, permissions) => {
-        state.permissions = permissions;
-    },
-    CLEAR_USER_DATA: (state) => {
-        state.user = null;
-        state.isLoggedIn = false;
-        state.permissions = []; // 登出时清空权限
+        state.permissions = permissions
     }
-};
+}
 
 const actions = {
-    // 用户登录 Action
-    async login({
-        commit,
-        dispatch
+    // 用户登录
+    // 用户登录
+    login({
+        commit
     }, userInfo) {
-        const response = await login(userInfo);
-        commit('SET_USER', response.user);
-        commit('SET_LOGGED_IN', true);
-        // 登录成功后，立即获取权限
-        await dispatch('getPermissions');
-        return response;
+        const {
+            username,
+            password
+        } = userInfo
+        return new Promise((resolve, reject) => {
+            loginApi({
+                username: username.trim(),
+                password: password
+            }).then(response => {
+                // 后端返回：{ message: "登录成功", user: {...} }
+                if (response.user) {
+                    // 存储用户信息
+                    commit('SET_USER', response.user)
+
+                    // 为会话认证设置一个虚拟token标识已登录状态
+                    const sessionToken = 'session_authenticated'
+                    commit('SET_TOKEN', sessionToken)
+                    setToken(sessionToken) // 存储到localStorage
+                }
+                resolve(response)
+            }).catch(error => {
+                reject(error)
+            })
+        })
+
+
     },
 
-    // 获取登录状态 Action
-    async getStatus({
-        commit,
-        dispatch
-    }) {
-        try {
-            const response = await getStatus();
-            if (response.logged_in) {
-                commit('SET_USER', response.user);
-                commit('SET_LOGGED_IN', true);
-                // 如果已登录，同样获取权限
-                await dispatch('getPermissions');
-            } else {
-                commit('CLEAR_USER_DATA');
-            }
-            return response.logged_in;
-        } catch (error) {
-            commit('CLEAR_USER_DATA');
-            return false;
-        }
-    },
 
-    // 新增：获取权限的 Action
-    async getPermissions({
+    // 获取用户信息
+    getInfo({
         commit
     }) {
-        try {
-            const permissions = await getMyPermissions();
-            commit('SET_PERMISSIONS', permissions);
-        } catch (error) {
-            console.error("获取用户权限失败", error);
-            commit('SET_PERMISSIONS', []); // 失败则设置为空数组
-        }
+        return new Promise((resolve, reject) => {
+            getInfoApi().then(response => {
+                const {
+                    data
+                } = response
+                if (!data) {
+                    reject('验证失败，请重新登录。')
+                }
+                const {
+                    user,
+                    roles,
+                    permissions
+                } = data
+                if (!roles || roles.length <= 0) {
+                    reject('getInfo：角色必须是非空数组！')
+                }
+                commit('SET_USER', user)
+                commit('SET_ROLES', roles)
+                commit('SET_PERMISSIONS', permissions || [])
+                resolve(data)
+            }).catch(error => {
+                reject(error)
+            })
+        })
     },
 
-    // 用户登出 Action
-    async logout({
+    // 用户登出 (最终修复: 只负责清理状态)
+    logout({
         commit
     }) {
-        try {
-            await logout();
-        } finally {
-            commit('CLEAR_USER_DATA');
-        }
+        return new Promise((resolve, reject) => {
+            logoutApi().then(() => {
+                commit('SET_TOKEN', '')
+                commit('SET_ROLES', [])
+                commit('SET_PERMISSIONS', [])
+                commit('SET_USER', null)
+                removeToken()
+
+                // ✅ 重置路由添加标记（如果使用了标记方案）
+                // isRoutesAdded = false
+
+                resolve()
+            }).catch(error => {
+                // 即使登出失败也要清理状态
+                commit('SET_TOKEN', '')
+                commit('SET_ROLES', [])
+                commit('SET_PERMISSIONS', [])
+                commit('SET_USER', null)
+                removeToken()
+                reject(error)
+            })
+        })
+    },
+
+
+
+    // 强制重置 token
+    resetToken({
+        commit
+    }) {
+        return new Promise(resolve => {
+            commit('SET_TOKEN', '')
+            commit('SET_ROLES', [])
+            commit('SET_PERMISSIONS', [])
+            removeToken()
+            resolve()
+        })
     }
-};
+}
+
 
 const getters = {
-    isLoggedIn: state => state.isLoggedIn,
+    token: state => state.token,
+    user: state => state.user,
+    roles: state => state.roles,
+    permissions: state => state.permissions,
+    isLoggedIn: state => !!state.token && !!state.user,
     currentUser: state => state.user,
-    userRole: state => state.user ? state.user.role : '',
-    // 新增：权限检查 Getter
-    hasPermission: (state) => (permissionName) => {
-        // SUPER 用户永远返回 true
-        if (state.user && state.user.role === 'SUPER') {
-            return true;
-        }
-        return state.permissions.includes(permissionName);
+    userRole: state => state.user?.role || 'MEMBER',
+    // ✅ 修复权限检查逻辑
+    hasPermission: state => (permission) => {
+        return state.permissions.some(p => p.name === permission)
     }
-};
+}
+
+
 
 export default {
     namespaced: true,
@@ -109,4 +164,5 @@ export default {
     mutations,
     actions,
     getters
-};
+
+}

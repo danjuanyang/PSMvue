@@ -1,59 +1,63 @@
-import axios from 'axios';
+import axios from 'axios'
 import {
-    message
-} from 'ant-design-vue';
-import store from '@/store'; // 引入Vuex store
+    removeToken
+} from '@/utils/auth'
 
-// 创建axios实例
 const service = axios.create({
-    // --- 这里是关键的修改 ---
-    // 确保 baseURL 是 '/api'，这样所有请求都会以 /api 开头
-    // 例如，请求 '/auth/login' 会变成 '/api/auth/login'
-    baseURL: '/api',
-    withCredentials: true,
-    timeout: 10000
-});
-
-
-// 请求拦截器 (可选，未来可用于添加token)
+    baseURL: process.env.VUE_APP_API_BASE_URL || '/api',
+    timeout: 5000,
+    withCredentials: true // 启用Cookie支持
+})
+// 请求拦截器 - 会话认证版本
 service.interceptors.request.use(
     config => {
-        // 可以在这里统一设置请求头，例如 token
-        // if (store.getters.token) {
-        //   config.headers['Authorization'] = `Bearer ${store.getters.token}`;
-        // }
-        return config;
+        // 会话认证不需要手动添加Authorization头
+        // 浏览器会自动发送Cookie
+        return config
     },
     error => {
-        console.log(error);
-        return Promise.reject(error);
+        console.log(error)
+        return Promise.reject(error)
     }
-);
+)
 
 
-// 响应拦截器
+// 响应拦截器 - 修复后的版本
 service.interceptors.response.use(
     response => {
-        return response.data;
+        const res = response.data
+
+        // 修复 #1: 使用 Object.prototype.hasOwnProperty.call 避免 ESLint 错误
+        if (!Object.prototype.hasOwnProperty.call(res, 'code')) {
+            // 后端直接返回数据格式，如 { message: "登录成功", user: {...} }
+            return res
+        }
+
+        // 如果有 code 字段的包装格式
+        if (res.code !== 200) {
+            console.error('API Error:', res.message)
+            return Promise.reject(new Error(res.message || 'Error'))
+        } else {
+            return res
+        }
     },
     error => {
-        console.error('API Error:', error.response);
-
-        if (error.response && error.response.data && error.response.data.error) {
-            message.error(error.response.data.error);
-
-            // --- 关键修改 ---
-            // 检查到401错误，并且当前Vuex中用户是登录状态，才执行登出
-            // 这可以防止在登录页面输入错误密码时触发不必要的登出操作
-            if (error.response.status === 401 && store.getters['user/isLoggedIn']) {
-                store.dispatch('user/logout');
+        console.log('err' + error)
+        // 处理HTTP状态码错误
+        if (error.response) {
+            const {
+                status,
+                data
+            } = error.response
+            if (status === 401) {
+                // token过期，清除本地数据
+                removeToken()
+                window.location.href = '/login'
             }
-
-        } else {
-            message.error('网络请求异常，请稍后重试');
+            return Promise.reject(new Error(data?.error || `HTTP ${status} Error`))
         }
-        return Promise.reject(error);
+        return Promise.reject(error)
     }
-);
+)
 
-export default service;
+export default service

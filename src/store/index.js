@@ -1,12 +1,23 @@
-import {
-    createStore
-} from 'vuex';
-import user from './modules/user'; // 导入我们之前创建的用户模块
 
-// 创建并导出一个新的 Vuex store 实例
-export default createStore({
-    // 将 user 模块注册到 store 中
+import Vuex from 'vuex'
+import user from './modules/user'
+import permission from './modules/permission'
+
+// **重要**: Vue.use(Vuex) 已经移动到 src/main.js 文件中
+// Vue.use(Vuex) // <- 从这里移除
+
+const store = new Vuex.Store({
     modules: {
-        user
+        user,
+        permission
+    },
+    getters: {
+        token: state => state.user.token,
+        user: state => state.user.user,
+        roles: state => state.user.roles,
+        permissions: state => state.user.permissions,
+        permission_routes: state => state.permission.routes
     }
-});
+})
+
+export default store

@@ -44,14 +44,10 @@ export function logout() {
     });
 }
 
-
-/**
- * 获取当前登录用户的所有权限
- */
-export function getMyPermissions() {
+export function getInfo() {
     return request({
-        url: '/auth/my-permissions',
-        method: 'get',
+        url: '/auth/status',
+        method: 'get'
     });
 }
-  
+
