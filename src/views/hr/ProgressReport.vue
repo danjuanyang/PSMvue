@@ -93,7 +93,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from "vue";
-import { getTaskProgressUpdates } from "@/api/hr";
+import { getTaskProgressUpdates } from "@/api/project";
 import { getUsers } from "@/api/admin";
 import { message } from "ant-design-vue";
 import dayjs from "dayjs";

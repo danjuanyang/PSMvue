@@ -208,6 +208,18 @@ export function updateTaskProgress(taskId, progressData) {
 }
 
 /**
+ * 获取任务进度更新列表
+ * @param {object} params - 查询参数，例如 { period, recorder_id }
+ */
+export function getTaskProgressUpdates(params) {
+    return request({
+        url: '/project/progress-updates',
+        method: 'get',
+        params
+    });
+}
+
+/**
  * 删除一个任务
  * @param {number} taskId
  */

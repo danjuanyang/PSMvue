@@ -55,11 +55,7 @@ router.beforeEach(async (to, from, next) => {
                     router.addRoute(route)
                 })
 
-                if (to.path === '/') {
-                    next('/dashboard')
-                } else {
-                    next(to.path)
-                }
+                next({ ...to, replace: true })
             } catch (error) {
                 await store.dispatch('user/logout')
                 message.error(error.message || '验证失败，请重新登录。')

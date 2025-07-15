@@ -214,7 +214,7 @@ const handleDeleteProject = async (projectId) => {
 
 // --- 修改：使用 router.push 跳转 ---
 const handleViewDetails = (project) => {
-  router.push(`/projects/${project.id}`);
+  router.push(`/project/detail/${project.id}`);
 };
 
 const columns = [
