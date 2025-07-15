@@ -43,16 +43,17 @@ service.interceptors.response.use(
     },
     error => {
         console.log('err' + error)
-        // 处理HTTP状态码错误
         if (error.response) {
             const {
                 status,
                 data
             } = error.response
             if (status === 401) {
-                // token过期，清除本地数据
-                removeToken()
-                window.location.href = '/login'
+                // ✅ 修复：只在非登录页面时跳转
+                if (window.location.pathname !== '/login') {
+                    removeToken()
+                    window.location.href = '/login'
+                }
             }
             return Promise.reject(new Error(data?.error || `HTTP ${status} Error`))
         }

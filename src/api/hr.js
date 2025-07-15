@@ -23,3 +23,16 @@ export function getClockInRecords(params) {
     params, // 将参数附加到 URL 查询字符串中
   });
 }
+
+
+/**
+ * 
+ * 请求正确的后端地址 /hr/task-progress-updates
+ */
+export function getTaskProgressUpdates(params) {
+  return request({
+    url: '/hr/task-progress-updates', // 这是修正后的正确URL
+    method: 'get',
+    params
+  })
+}

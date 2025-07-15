@@ -109,8 +109,12 @@ const actions = {
                 commit('SET_USER', null)
                 removeToken()
 
-                // ✅ 重置路由添加标记（如果使用了标记方案）
-                // isRoutesAdded = false
+                // ✅ 清理路由相关状态
+                if (typeof window !== 'undefined') {
+                    window.isRoutesAdded = false
+                    // 清理已添加路由记录
+                    window.addedRouteNames = new Set()
+                }
 
                 resolve()
             }).catch(error => {
@@ -120,6 +124,12 @@ const actions = {
                 commit('SET_PERMISSIONS', [])
                 commit('SET_USER', null)
                 removeToken()
+
+                if (typeof window !== 'undefined') {
+                    window.isRoutesAdded = false
+                    window.addedRouteNames = new Set()
+                }
+
                 reject(error)
             })
         })
@@ -127,7 +137,7 @@ const actions = {
 
 
 
-    // 强制重置 token
+    // ✅ 新增：重置token而不调用API
     resetToken({
         commit
     }) {
@@ -135,7 +145,14 @@ const actions = {
             commit('SET_TOKEN', '')
             commit('SET_ROLES', [])
             commit('SET_PERMISSIONS', [])
+            commit('SET_USER', null)
             removeToken()
+
+            if (typeof window !== 'undefined') {
+                window.isRoutesAdded = false
+                window.addedRouteNames = new Set()
+            }
+
             resolve()
         })
     }

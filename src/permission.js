@@ -1,31 +1,28 @@
+// src/permission.js
 import router from './router'
 import store from './store'
-// 使用 Ant Design Vue 的 message 组件进行提示
 import {
     message
 } from 'ant-design-vue'
-// NProgress 用于页面加载进度条
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-
-// 假设您有一个从 cookie 或 localStorage 获取 token 的工具函数
-// 如果没有，请确保 store.state.user.token 能正确初始化
 import {
     getToken
 } from '@/utils/auth'
 
 NProgress.configure({
     showSpinner: false
-}) // NProgress 配置
+})
 
-const whiteList = ['/login'] // 免登录白名单
-
+const whiteList = ['/login']
+let isRoutesAdded = false
+let addedRouteNames = new Set()
 
 router.beforeEach(async (to, from, next) => {
     NProgress.start()
     document.title = to.meta.title || 'PSM System'
 
-    const hasToken = store.getters.token || getToken()
+    const hasToken = store.getters['user/token'] || getToken()
 
     if (hasToken) {
         if (to.path === '/login') {
@@ -36,49 +33,84 @@ router.beforeEach(async (to, from, next) => {
             return
         }
 
-        const hasUserInfo = store.getters.user && store.getters.user.id
+        const hasUserInfo = store.getters['user/user'] && store.getters['user/user'].id
 
-        if (hasUserInfo) {
-            next()
+        if (hasUserInfo && isRoutesAdded) {
+            const routeExists = router.hasRoute(to.name) || to.matched.length > 0
+            if (routeExists) {
+                next()
+            } else {
+                next('/dashboard')
+            }
         } else {
             try {
                 const {
                     roles,
                     permissions
                 } = await store.dispatch('user/getInfo')
-                const accessRoutes = await store.dispatch('permission/generateRoutes', {
-                    roles,
-                    permissions
-                })
 
-                accessRoutes.forEach(route => {
-                    router.addRoute(route)
-                })
+                if (!isRoutesAdded) {
+                    const accessRoutes = await store.dispatch('permission/generateRoutes', {
+                        roles,
+                        permissions
+                    })
 
-                next({ ...to, replace: true })
+                    accessRoutes.forEach(route => {
+                        if (!addedRouteNames.has(route.name)) {
+                            router.addRoute(route)
+                            addedRouteNames.add(route.name)
+
+                            if (route.children) {
+                                route.children.forEach(child => {
+                                    if (child.name) addedRouteNames.add(child.name)
+                                })
+                            }
+                        }
+                    })
+                    isRoutesAdded = true
+                }
+
+                if (to.path === '/') {
+                    next('/dashboard')
+                } else if (to.matched.length === 0) {
+                    next({
+                        path: to.path,
+                        replace: true
+                    })
+                } else {
+                    next()
+                }
             } catch (error) {
-                await store.dispatch('user/logout')
-                message.error(error.message || '验证失败，请重新登录。')
-                // ✅ 修复：重定向到登录页而不是原路径
-                next(`/login?redirect=${to.path}`)
+                console.error('Permission error:', error)
+                isRoutesAdded = false
+                addedRouteNames.clear()
+
+                // ✅ 修复：区分登录页面和其他页面的错误处理
+                if (to.path === '/login' || from.path === '/login') {
+                    // 在登录页面或从登录页面来的，不显示错误信息，不强制跳转
+                    await store.dispatch('user/resetToken')
+                    next()
+                } else {
+                    // 在其他页面，显示错误并跳转到登录页
+                    await store.dispatch('user/logout')
+                    message.error(error.message || '验证失败，请重新登录。')
+                    next(`/login?redirect=${to.path}`)
+                }
                 NProgress.done()
             }
         }
     } else {
+        isRoutesAdded = false
+        addedRouteNames.clear()
         if (whiteList.indexOf(to.path) !== -1) {
             next()
         } else {
-            // ✅ 关键修复：重定向到登录页面
             next(`/login?redirect=${to.path}`)
             NProgress.done()
         }
     }
 })
 
-
-
-
 router.afterEach(() => {
-    // 结束进度条
     NProgress.done()
 })

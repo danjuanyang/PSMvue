@@ -1,6 +1,10 @@
 <template>
   <a-layout style="min-height: 100vh">
-    <a-layout-sider v-if="isLoggedIn" v-model:collapsed="collapsed" collapsible>
+    <a-layout-sider
+      v-if="isLoggedIn && userLoaded"
+      v-model:collapsed="collapsed"
+      collapsible
+    >
       <div class="logo" />
       <a-menu
         v-model:selectedKeys="selectedKeys"
@@ -117,30 +121,55 @@ watch(
   (newRoute) => {
     if (newRoute.name === "Dashboard") selectedKeys.value = ["dashboard"];
     else if (newRoute.path.startsWith("/project")) selectedKeys.value = ["projects"];
-    else if (newRoute.path.startsWith("/announcement")) selectedKeys.value = ["announcements"];
+    else if (newRoute.path.startsWith("/announcement"))
+      selectedKeys.value = ["announcements"];
     else if (newRoute.path.startsWith("/admin")) selectedKeys.value = ["permissions"];
     else if (newRoute.path.startsWith("/hr/clock-in")) {
       selectedKeys.value = isAdmin.value ? ["clock-in-stats"] : ["clock-in-report"];
-    }
-    else if (newRoute.path.startsWith("/hr/progress")) selectedKeys.value = ["progress-report"];
+    } else if (newRoute.path.startsWith("/hr/progress"))
+      selectedKeys.value = ["progress-report"];
   },
   { immediate: true }
 );
 
-
 const handleMenuClick = (e) => {
-  if (e.key === "dashboard") router.push("/");
-  else if (e.key === "projects") router.push("/project/list");
-  // ✅ 修正路径
-  else if (e.key === "announcements") router.push("/announcement/index");
-  // ✅ 修正路径
-  else if (e.key === "permissions") router.push("/admin/permission-management");
-  // ✅ 修正路径
-  else if (e.key === "clock-in-report" || e.key === "clock-in-stats") {
-    router.push("/hr/clock-in-report");
+  // ✅ 防止重复导航
+  if (route.path === getTargetPath(e.key)) {
+    return;
   }
-  if (e.key === "progress-report") router.push("/hr/progress-report");
+
+  const targetPath = getTargetPath(e.key);
+  if (targetPath) {
+    router.push(targetPath).catch((err) => {
+      // ✅ 捕获导航错误，避免控制台报错
+      if (err.name !== "NavigationDuplicated") {
+        console.error("Navigation error:", err);
+      }
+    });
+  }
 };
+
+// ✅ 新增：统一管理路径映射
+const getTargetPath = (key) => {
+  const pathMap = {
+    dashboard: "/",
+    projects: "/project/list",
+    announcements: "/announcement/index",
+    permissions: "/admin/permission-management",
+    "clock-in-report": "/hr/clock-in-report",
+    "clock-in-stats": "/hr/clock-in-report",
+    "progress-report": "/hr/progress-report",
+  };
+  return pathMap[key];
+};
+
+const userLoaded = computed(() => {
+  return (
+    store.getters["user/isLoggedIn"] &&
+    store.getters["user/currentUser"] &&
+    store.getters["user/permissions"].length >= 0
+  );
+});
 
 const handleLogout = async () => {
   try {

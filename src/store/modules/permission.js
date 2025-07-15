@@ -10,13 +10,33 @@ import {
  * @param {Object} route - 需要检查的路由对象
  * @returns {boolean}
  */
+
+// 添加权限检查缓存
+const permissionCache = new Map()
+
 function hasPermission(permissions, route) {
-    if (route.meta && route.meta.permissions) {
-        return permissions.some(p => route.meta.permissions.includes(p.name))
-    } else {
-        return true
+    const cacheKey = `${route.path}_${permissions.map(p => p.name).join(',')}`
+
+    if (permissionCache.has(cacheKey)) {
+        return permissionCache.get(cacheKey)
     }
+
+    let result = true
+    if (route.meta && route.meta.permissions) {
+        result = permissions.some(p => route.meta.permissions.includes(p.name))
+    }
+
+    permissionCache.set(cacheKey, result)
+    return result
 }
+
+// function hasPermission(permissions, route) {
+//     if (route.meta && route.meta.permissions) {
+//         return permissions.some(p => route.meta.permissions.includes(p.name))
+//     } else {
+//         return true
+//     }
+// }
 
 /**
  * 通过递归过滤异步路由表
@@ -58,6 +78,7 @@ const mutations = {
     }
 }
 
+
 const actions = {
     generateRoutes({
         commit
@@ -66,6 +87,9 @@ const actions = {
         permissions
     }) {
         return new Promise(resolve => {
+            // ✅ 清理权限缓存，确保最新权限生效
+            permissionCache.clear()
+
             let accessedRoutes
             if (roles.includes('SUPER')) {
                 accessedRoutes = asyncRoutes || []
@@ -75,6 +99,14 @@ const actions = {
             commit('SET_ROUTES', accessedRoutes)
             resolve(accessedRoutes)
         })
+    },
+
+    // ✅ 新增：清理权限缓存的 action
+    clearPermissionCache({
+        commit
+    }) {
+        permissionCache.clear()
+        commit('SET_ROUTES', [])
     }
 }
 

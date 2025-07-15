@@ -1,3 +1,4 @@
+//src/router/index.js
 import {
     createRouter,
     createWebHistory
@@ -16,13 +17,35 @@ const createRouterInstance = () => createRouter({
 
 const router = createRouterInstance()
 
-/**
- * 重置路由的方法。
- * 当用户登出时，调用此方法来重置路由，清除动态添加的权限路由。
- */
 export function resetRouter() {
     const newRouter = createRouterInstance()
     router.matcher = newRouter.matcher
+
+    // 清理动态添加的路由
+    router.getRoutes().forEach(route => {
+        const {
+            name
+        } = route
+        if (name && !constantRoutes.find(r => r.name === name)) {
+            router.removeRoute(name)
+        }
+    })
 }
+
+export function clearDynamicRoutes() {
+    // 获取所有路由
+    const routes = router.getRoutes()
+
+    // 移除动态添加的路由（不在 constantRoutes 中的）
+    routes.forEach(route => {
+        if (route.name && !constantRoutes.find(r => r.name === route.name)) {
+            router.removeRoute(route.name)
+        }
+    })
+}
+
+// 在 router 实例上添加清理方法
+router.clearDynamicRoutes = clearDynamicRoutes
+
 
 export default router

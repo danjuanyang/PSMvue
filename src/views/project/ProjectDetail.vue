@@ -238,10 +238,18 @@
         v-model:fileList="fileList"
         name="file"
         :before-upload="() => false"
+        multiple
+        :accept="'.txt,.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar'"
       >
         <p class="ant-upload-drag-icon"><InboxOutlined /></p>
         <p class="ant-upload-text">点击或拖拽文件到此区域上传</p>
+        <p class="ant-upload-hint">支持的文件类型: txt, pdf, png, jpg, jpeg, gif, doc, docx, xls, xlsx, ppt, pptx, zip, rar</p>
       </a-upload-dragger>
+
+      <!-- 设置文件是否公开 -->
+      <div style="margin-top: 16px;">
+        <a-checkbox v-model:checked="isPublicFile">设为公开文件（允许非项目成员查看）</a-checkbox>
+      </div>
 
       <a-divider>已上传文件</a-divider>
       <a-list
@@ -270,6 +278,8 @@
         </template>
       </a-list>
     </a-modal>
+
+
   </div>
 </template>
 
@@ -336,6 +346,7 @@ const fileList = ref([]);
 const uploading = ref(false);
 const taskFiles = ref([]); // 新增：用于存储已上传文件
 const taskFilesLoading = ref(false); // 新增：列表加载状态
+const isPublicFile = ref(false); // 新增：文件是否公开的标志
 
 // --- Computed ---
 const user = computed(() => store.getters["user/currentUser"]);
@@ -443,6 +454,7 @@ const openUploadModal = async (task) => {
   currentTaskForUpload.value = task;
   isUploadModalVisible.value = true;
   fileList.value = []; // 清空待上传列表
+  isPublicFile.value = false; // 重置文件公开状态
 
   // 加载已有文件列表
   taskFilesLoading.value = true;
@@ -524,26 +536,63 @@ const handleTaskOk = async () => {
 const handleUpload = async () => {
   // 1. 检查 fileList 是否为空
   if (!fileList.value || fileList.value.length === 0) {
-    message.error("请选择一个文件！");
+    message.error("请选择至少一个文件！");
     return;
   }
-  // Ant Design 的 v-model:fileList 数组中的每个对象都包含 originFileObj
-  const fileToUpload = fileList.value[0]?.originFileObj;
-  // 3. 再次检查是否成功获取文件
-  if (!fileToUpload) {
-    message.error("无法获取文件，请重新选择。");
-    return;
-  }
-  const formData = new FormData();
-  formData.append("file", fileToUpload);
 
   uploading.value = true;
+  const totalFiles = fileList.value.length;
+  let successCount = 0;
+
   try {
-    await uploadFileForTask(currentTaskForUpload.value.id, formData);
-    message.success("上传成功");
-    isUploadModalVisible.value = false;
+    // 循环上传所有选择的文件
+    for (const file of fileList.value) {
+      // 获取原始文件对象
+      const fileToUpload = file.originFileObj;
+      if (!fileToUpload) {
+        continue; // 跳过无效文件
+      }
+
+      // 检查文件类型
+      const fileName = fileToUpload.name;
+      const fileExt = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
+      const allowedExts = ['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 
+                          'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar'];
+
+      if (!allowedExts.includes(fileExt)) {
+        message.warning(`文件 "${fileName}" 类型不支持，已跳过。`);
+        continue;
+      }
+
+      const formData = new FormData();
+      formData.append("file", fileToUpload);
+
+      // 添加是否公开参数
+      formData.append("is_public", isPublicFile.value);
+
+      try {
+        await uploadFileForTask(currentTaskForUpload.value.id, formData);
+        successCount++;
+      } catch (error) {
+        message.error(`文件 "${fileName}" 上传失败`);
+      }
+    }
+
+    if (successCount > 0) {
+      message.success(`成功上传 ${successCount}/${totalFiles} 个文件`);
+      isUploadModalVisible.value = false;
+
+      // 刷新文件列表
+      try {
+        taskFiles.value = await getTaskFiles(currentTaskForUpload.value.id);
+      } catch (error) {
+        // 忽略刷新列表的错误
+      }
+    } else {
+      message.error("没有文件成功上传");
+    }
   } catch (error) {
-    message.error("上传失败");
+    message.error("上传过程中发生错误");
   } finally {
     uploading.value = false;
   }
