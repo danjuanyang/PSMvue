@@ -31,8 +31,20 @@ export function getClockInRecords(params) {
  */
 export function getTaskProgressUpdates(params) {
   return request({
-    url: '/hr/task-progress-updates', // 这是修正后的正确URL
+    url: '/hr/task-progress-updates',
     method: 'get',
     params
   })
+}
+
+
+/**
+ * 获取自己当月的补卡记录
+
+ */
+export function getMyCurrentMonthRecords() {
+  return request({
+    url: '/hr/clock-in-records/my-current-month',
+    method: 'get',
+  });
 }

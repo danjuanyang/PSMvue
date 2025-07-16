@@ -35,12 +35,12 @@
           >
           <!-- 使用权限判断 -->
           <a-menu-item
-            key="clock-in-report"
-            v-if="!hasPermission('view_clock_in_reports')"
-            >补卡填报</a-menu-item
-          >
-          <a-menu-item key="clock-in-stats" v-if="hasPermission('view_clock_in_reports')"
+            key="clock-in-state"
+             v-if="hasPermission('view_clock_in_reports')"
             >补卡统计</a-menu-item
+          >
+          <a-menu-item key="clock-in-apply"
+            >补卡填报</a-menu-item
           >
           <a-menu-item key="progress-report" v-if="hasPermission('view_progress_reports')"
             >进度报告</a-menu-item
@@ -157,7 +157,7 @@ const getTargetPath = (key) => {
     announcements: "/announcement/index",
     permissions: "/admin/permission-management",
     "clock-in-report": "/hr/clock-in-report",
-    "clock-in-stats": "/hr/clock-in-report",
+    "clock-in-stats": "/hr/clock-in-stats",
     "progress-report": "/hr/progress-report",
   };
   return pathMap[key];
