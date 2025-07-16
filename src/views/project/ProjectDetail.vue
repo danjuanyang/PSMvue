@@ -240,16 +240,41 @@
         :before-upload="() => false"
         multiple
         :accept="'.txt,.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar'"
+        :show-upload-list="false"
       >
         <p class="ant-upload-drag-icon"><InboxOutlined /></p>
         <p class="ant-upload-text">点击或拖拽文件到此区域上传</p>
-        <p class="ant-upload-hint">支持的文件类型: txt, pdf, png, jpg, jpeg, gif, doc, docx, xls, xlsx, ppt, pptx, zip, rar</p>
+        <p class="ant-upload-hint">
+          支持的文件类型: txt, pdf, png, jpg, jpeg, gif, doc, docx, xls, xlsx, ppt, pptx,
+          zip, rar
+        </p>
       </a-upload-dragger>
 
-      <!-- 设置文件是否公开 -->
-      <div style="margin-top: 16px;">
-        <a-checkbox v-model:checked="isPublicFile">设为公开文件（允许非项目成员查看）</a-checkbox>
-      </div>
+      <!-- 待上传文件队列 -->
+      <a-list
+        v-if="fileList.length"
+        class="upload-queue-list"
+        :data-source="fileList"
+        item-layout="horizontal"
+        style="margin-top: 16px"
+      >
+        <template #header><strong>待上传文件队列</strong></template>
+        <template #renderItem="{ item }">
+          <a-list-item>
+            <a-list-item-meta :title="item.name" />
+            <template #actions>
+              <a-switch
+                v-model:checked="item.is_public"
+                checked-children="公开"
+                un-checked-children="私有"
+              />
+              <a-button type="link" danger @click="removeFileFromList(item.uid)"
+                >删除</a-button
+              >
+            </template>
+          </a-list-item>
+        </template>
+      </a-list>
 
       <a-divider>已上传文件</a-divider>
       <a-list
@@ -260,11 +285,18 @@
         <template #renderItem="{ item }">
           <a-list-item>
             <a-list-item-meta
-              :title="item.original_name"
               :description="`上传者: ${item.uploader_name} | 时间: ${dayjs(
                 item.upload_date
               ).format('YYYY-MM-DD HH:mm')}`"
             >
+              <template #title>
+                <a-space>
+                  <span>{{ item.original_name }}</span>
+                  <a-tag :color="item.is_public ? 'blue' : 'orange'">
+                    {{ item.is_public ? "公开" : "私有" }}
+                  </a-tag>
+                </a-space>
+              </template>
               <template #avatar>
                 <a-avatar style="background-color: #1890ff"
                   ><PaperClipOutlined
@@ -278,8 +310,6 @@
         </template>
       </a-list>
     </a-modal>
-
-
   </div>
 </template>
 
@@ -301,7 +331,7 @@ import {
   updateTask,
   uploadFileForTask,
   getUsersByRole,
-  getTaskFiles
+  getTaskFiles,
 } from "@/api/project";
 
 import { message } from "ant-design-vue";
@@ -346,7 +376,13 @@ const fileList = ref([]);
 const uploading = ref(false);
 const taskFiles = ref([]); // 新增：用于存储已上传文件
 const taskFilesLoading = ref(false); // 新增：列表加载状态
-const isPublicFile = ref(false); // 新增：文件是否公开的标志
+
+const removeFileFromList = (uid) => {
+  const index = fileList.value.findIndex((file) => file.uid === uid);
+  if (index !== -1) {
+    fileList.value.splice(index, 1);
+  }
+};
 
 // --- Computed ---
 const user = computed(() => store.getters["user/currentUser"]);
@@ -454,7 +490,6 @@ const openUploadModal = async (task) => {
   currentTaskForUpload.value = task;
   isUploadModalVisible.value = true;
   fileList.value = []; // 清空待上传列表
-  isPublicFile.value = false; // 重置文件公开状态
 
   // 加载已有文件列表
   taskFilesLoading.value = true;
@@ -534,7 +569,6 @@ const handleTaskOk = async () => {
 };
 
 const handleUpload = async () => {
-  // 1. 检查 fileList 是否为空
   if (!fileList.value || fileList.value.length === 0) {
     message.error("请选择至少一个文件！");
     return;
@@ -545,44 +579,27 @@ const handleUpload = async () => {
   let successCount = 0;
 
   try {
-    // 循环上传所有选择的文件
     for (const file of fileList.value) {
-      // 获取原始文件对象
       const fileToUpload = file.originFileObj;
       if (!fileToUpload) {
-        continue; // 跳过无效文件
-      }
-
-      // 检查文件类型
-      const fileName = fileToUpload.name;
-      const fileExt = fileName.substring(fileName.lastIndexOf('.') + 1).toLowerCase();
-      const allowedExts = ['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif', 'doc', 'docx', 
-                          'xls', 'xlsx', 'ppt', 'pptx', 'zip', 'rar'];
-
-      if (!allowedExts.includes(fileExt)) {
-        message.warning(`文件 "${fileName}" 类型不支持，已跳过。`);
         continue;
       }
 
       const formData = new FormData();
       formData.append("file", fileToUpload);
-
-      // 添加是否公开参数
-      formData.append("is_public", isPublicFile.value);
+      formData.append("is_public", file.is_public || false); // 使用每个文件自己的状态
 
       try {
         await uploadFileForTask(currentTaskForUpload.value.id, formData);
         successCount++;
       } catch (error) {
-        message.error(`文件 "${fileName}" 上传失败`);
+        message.error(`文件 "${file.name}" 上传失败`);
       }
     }
 
     if (successCount > 0) {
       message.success(`成功上传 ${successCount}/${totalFiles} 个文件`);
       isUploadModalVisible.value = false;
-
-      // 刷新文件列表
       try {
         taskFiles.value = await getTaskFiles(currentTaskForUpload.value.id);
       } catch (error) {
