@@ -48,36 +48,6 @@ function hasPermission(permissions, route) {
 
 
 /**
- * 通过递归过滤异步路由表
- * @param {Array} routes - asyncRoutes
- * @param {Array} permissions - 用户的权限列表
- * @returns {Array} - 过滤后的可访问路由
- */
-// export function filterAsyncRoutes(routes, permissions) {
-//     const res = []
-
-//     routes.forEach(route => {
-//         const tmp = {
-//             ...route
-//         }
-//         if (hasPermission(permissions, tmp)) {
-//             if (tmp.children) {
-//                 tmp.children = filterAsyncRoutes(tmp.children, permissions)
-//                 if (tmp.children.length > 0) {
-//                     res.push(tmp)
-//                 }
-//             } else {
-//                 res.push(tmp)
-//             }
-//         }
-//     })
-
-//     return res
-// }
-
-
-
-/**
  * [核心修改] 通过递归过滤异步路由表，并动态修正重定向
  * @param {Array} routes - 待过滤的路由数组 (asyncRoutes)
  * @param {Array<string>} permissions - 用户拥有的权限名称列表
@@ -139,21 +109,14 @@ const actions = {
     generateRoutes({
         commit
     }, {
-        roles,
         permissions
     }) {
         return new Promise(resolve => {
             let accessedRoutes
-
-            // 从 [{name: '...'}, ...] 转换为 ['...', '...']
             const permissionNames = permissions.map(p => p.name);
 
-            // 如果是超级管理员，拥有所有路由
-            if (roles.includes('SUPER') || roles.includes('ADMIN')) { // 兼容旧的 'admin' 角色判断
-                accessedRoutes = asyncRoutes || []
-            } else {
-                accessedRoutes = filterAsyncRoutes(asyncRoutes, permissionNames)
-            }
+            // 所有角色都根据权限过滤路由
+            accessedRoutes = filterAsyncRoutes(asyncRoutes, permissionNames)
             commit('SET_ROUTES', accessedRoutes)
             resolve(accessedRoutes)
         })

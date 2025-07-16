@@ -35,11 +35,11 @@
           >
           <!-- 使用权限判断 -->
           <a-menu-item
-            key="clock-in-state"
+            key="clock-in-stats"
              v-if="hasPermission('view_clock_in_reports')"
             >补卡统计</a-menu-item
           >
-          <a-menu-item key="clock-in-apply"
+          <a-menu-item key="clock-in-apply" v-if="!isAdmin"
             >补卡填报</a-menu-item
           >
           <a-menu-item key="progress-report" v-if="hasPermission('view_progress_reports')"
@@ -157,6 +157,7 @@ const getTargetPath = (key) => {
     announcements: "/announcement/index",
     permissions: "/admin/permission-management",
     "clock-in-report": "/hr/clock-in-report",
+    "clock-in-apply": "/hr/clock-in-apply", // 新增：补卡填报的路径
     "clock-in-stats": "/hr/clock-in-stats",
     "progress-report": "/hr/progress-report",
   };

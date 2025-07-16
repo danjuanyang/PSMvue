@@ -92,9 +92,7 @@ export const asyncRoutes = [{
                 name: 'ClockInApply',
                 component: () => import('@/views/hr/ClockInApply.vue'), // 指向填报组件
                 meta: {
-                    title: '补卡填报',
-                   
-                }
+                    title: '补卡填报',}
             },
             {
                 path: 'clock-in-stats', // 为“补卡统计”创建独立路径
