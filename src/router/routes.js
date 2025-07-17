@@ -140,6 +140,19 @@ export const asyncRoutes = [{
             } // 子菜单继承父级权限
         }]
     },
+    {
+        path: '/files',
+        component: AppLayout,
+        children: [{
+            path: 'index',
+            name: 'FileManager',
+            component: () => import('@/views/file/FileManagement.vue'),
+            meta: {
+                title: '文件管理',
+                icon: 'file'
+            }
+        }]
+    },
     // 404 页面必须放在路由最后
     {
         path: '/:pathMatch(.*)*',

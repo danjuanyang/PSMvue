@@ -26,6 +26,11 @@
           <sound-outlined />
           <span>系统公告</span>
         </a-menu-item>
+        <!-- 文件管理 -->
+        <a-menu-item key="files">
+          <folder-outlined />
+          <span>文件管理</span>
+        </a-menu-item>
 
         <!-- 修改：所有角色都能看到HR菜单 -->
 
@@ -34,14 +39,10 @@
             ><span><solution-outlined /><span>人事/行政</span></span></template
           >
           <!-- 使用权限判断 -->
-          <a-menu-item
-            key="clock-in-stats"
-             v-if="hasPermission('view_clock_in_reports')"
+          <a-menu-item key="clock-in-stats" v-if="hasPermission('view_clock_in_reports')"
             >补卡统计</a-menu-item
           >
-          <a-menu-item key="clock-in-apply" v-if="!isAdmin"
-            >补卡填报</a-menu-item
-          >
+          <a-menu-item key="clock-in-apply" v-if="!isAdmin">补卡填报</a-menu-item>
           <a-menu-item key="progress-report" v-if="hasPermission('view_progress_reports')"
             >进度报告</a-menu-item
           >
@@ -123,6 +124,7 @@ watch(
     else if (newRoute.path.startsWith("/project")) selectedKeys.value = ["projects"];
     else if (newRoute.path.startsWith("/announcement"))
       selectedKeys.value = ["announcements"];
+    else if (newRoute.path.startsWith("/files")) selectedKeys.value = ["files"];
     else if (newRoute.path.startsWith("/admin")) selectedKeys.value = ["permissions"];
     else if (newRoute.path.startsWith("/hr/clock-in")) {
       selectedKeys.value = isAdmin.value ? ["clock-in-stats"] : ["clock-in-report"];
@@ -160,6 +162,7 @@ const getTargetPath = (key) => {
     "clock-in-apply": "/hr/clock-in-apply", // 新增：补卡填报的路径
     "clock-in-stats": "/hr/clock-in-stats",
     "progress-report": "/hr/progress-report",
+    files: "/files/index",
   };
   return pathMap[key];
 };
