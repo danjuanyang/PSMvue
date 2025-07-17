@@ -153,6 +153,21 @@ export const asyncRoutes = [{
             }
         }]
     },
+     {
+         path: '/profile',
+         component: AppLayout,
+         redirect: '/profile/index',
+         hidden: true, // 在侧边栏中隐藏
+         children: [{
+             path: 'index',
+             name: 'Profile',
+             component: () => import('@/views/user/ProfileView.vue'),
+             meta: {
+                 title: '个人中心',
+                 icon: 'user'
+             }
+         }]
+     },
     // 404 页面必须放在路由最后
     {
         path: '/:pathMatch(.*)*',

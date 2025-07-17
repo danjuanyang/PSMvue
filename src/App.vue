@@ -12,6 +12,7 @@
         mode="inline"
         @click="handleMenuClick"
       >
+        <!-- 侧边栏菜单项... (保留您已有的 a-menu-item 和 a-sub-menu) -->
         <a-menu-item key="dashboard">
           <pie-chart-outlined />
           <span>Dashboard</span>
@@ -20,25 +21,18 @@
           <desktop-outlined />
           <span>我的项目</span>
         </a-menu-item>
-
-        <!-- 新增公告菜单项 -->
         <a-menu-item key="announcements">
           <sound-outlined />
           <span>系统公告</span>
         </a-menu-item>
-        <!-- 文件管理 -->
         <a-menu-item key="files">
           <folder-outlined />
           <span>文件管理</span>
         </a-menu-item>
-
-        <!-- 修改：所有角色都能看到HR菜单 -->
-
         <a-sub-menu key="hr">
           <template #title
             ><span><solution-outlined /><span>人事/行政</span></span></template
           >
-          <!-- 使用权限判断 -->
           <a-menu-item key="clock-in-stats" v-if="hasPermission('view_clock_in_reports')"
             >补卡统计</a-menu-item
           >
@@ -47,7 +41,6 @@
             >进度报告</a-menu-item
           >
         </a-sub-menu>
-
         <a-menu-item
           key="permissions"
           v-if="hasPermission('manage_roles') || hasPermission('manage_permissions')"
@@ -69,11 +62,30 @@
           align-items: center;
         "
       >
+        <!-- 改造开始：将原来的 a-space 替换为 a-dropdown -->
+        <a-dropdown>
+          <!-- 下拉菜单的触发区域 -->
+          <a class="ant-dropdown-link" @click.prevent>
+            <a-space>
+              <a-avatar
+                ><template #icon><UserOutlined /></template
+              ></a-avatar>
+              <span>{{ username }}</span>
+            </a-space>
+          </a>
+          <!-- 下拉菜单的内容 -->
+          <template #overlay>
+            <a-menu @click="handleDropdownClick">
+              <a-menu-item key="profile">
+                <UserOutlined />
+                <span style="margin-left: 8px">个人中心</span>
+              </a-menu-item>
+            </a-menu>
+          </template>
+        </a-dropdown>
+
         <a-space>
-          <a-avatar
-            ><template #icon><UserOutlined /></template
-          ></a-avatar>
-          <span>{{ username }}</span>
+         
           <a-button type="link" @click="handleLogout">
             <template #icon><LogoutOutlined /></template>
             登出
@@ -98,6 +110,9 @@ import {
   UserOutlined,
   LogoutOutlined,
   SettingOutlined,
+  SoundOutlined, // 确保已导入
+  FolderOutlined, // 确保已导入
+  SolutionOutlined, // 确保已导入
 } from "@ant-design/icons-vue";
 import { message } from "ant-design-vue";
 
@@ -110,13 +125,12 @@ const selectedKeys = ref(["dashboard"]);
 
 const isLoggedIn = computed(() => store.getters["user/isLoggedIn"]);
 const username = computed(() => store.getters["user/currentUser"]?.username || "用户");
-// 添加权限判断
 const hasPermission = computed(() => store.getters["user/hasPermission"]);
 const isAdmin = computed(() =>
   ["SUPER", "ADMIN"].includes(store.getters["user/userRole"])
 );
 
-// 监听路由变化，更新菜单选中状态
+// 监听路由变化，更新菜单选中状态 (保留您已有的逻辑)
 watch(
   route,
   (newRoute) => {
@@ -126,7 +140,10 @@ watch(
       selectedKeys.value = ["announcements"];
     else if (newRoute.path.startsWith("/files")) selectedKeys.value = ["files"];
     else if (newRoute.path.startsWith("/admin")) selectedKeys.value = ["permissions"];
-    else if (newRoute.path.startsWith("/hr/clock-in")) {
+    // 路由 /profile/index 激活时，不改变侧边栏选中状态
+    else if (newRoute.path.startsWith("/profile")) {
+      // 保持当前选中项不变
+    } else if (newRoute.path.startsWith("/hr/clock-in")) {
       selectedKeys.value = isAdmin.value ? ["clock-in-stats"] : ["clock-in-report"];
     } else if (newRoute.path.startsWith("/hr/progress"))
       selectedKeys.value = ["progress-report"];
@@ -134,16 +151,14 @@ watch(
   { immediate: true }
 );
 
+// 侧边栏点击事件 (保留您已有的逻辑)
 const handleMenuClick = (e) => {
-  // ✅ 防止重复导航
   if (route.path === getTargetPath(e.key)) {
     return;
   }
-
   const targetPath = getTargetPath(e.key);
   if (targetPath) {
     router.push(targetPath).catch((err) => {
-      // ✅ 捕获导航错误，避免控制台报错
       if (err.name !== "NavigationDuplicated") {
         console.error("Navigation error:", err);
       }
@@ -151,7 +166,7 @@ const handleMenuClick = (e) => {
   }
 };
 
-// ✅ 新增：统一管理路径映射
+// 路径映射 (保留您已有的逻辑)
 const getTargetPath = (key) => {
   const pathMap = {
     dashboard: "/",
@@ -159,7 +174,7 @@ const getTargetPath = (key) => {
     announcements: "/announcement/index",
     permissions: "/admin/permission-management",
     "clock-in-report": "/hr/clock-in-report",
-    "clock-in-apply": "/hr/clock-in-apply", // 新增：补卡填报的路径
+    "clock-in-apply": "/hr/clock-in-apply",
     "clock-in-stats": "/hr/clock-in-stats",
     "progress-report": "/hr/progress-report",
     files: "/files/index",
@@ -175,6 +190,7 @@ const userLoaded = computed(() => {
   );
 });
 
+// 登出逻辑 (保留您已有的逻辑)
 const handleLogout = async () => {
   try {
     await store.dispatch("user/logout");
@@ -182,6 +198,15 @@ const handleLogout = async () => {
     router.push("/login");
   } catch (error) {
     message.error("登出失败，请稍后重试");
+  }
+};
+
+// 新增：处理下拉菜单点击事件
+const handleDropdownClick = ({ key }) => {
+  if (key === "profile") {
+    router.push({ name: "Profile" });
+  } else if (key === "logout") {
+    handleLogout();
   }
 };
 </script>

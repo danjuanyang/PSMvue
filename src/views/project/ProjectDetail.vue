@@ -6,7 +6,7 @@
       <a-page-header
         :title="project.name"
         class="page-header"
-        @back="() => router.push('/projects')"
+        @back="() => router.push('/project')"
       >
         <template #extra>
           <a-button key="1" type="primary" @click="openSubprojectModal()" v-if="isLeader"

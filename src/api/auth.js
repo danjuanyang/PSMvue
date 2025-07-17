@@ -51,3 +51,39 @@ export function getInfo() {
     });
 }
 
+
+/**
+ * 修改密码
+ * @param {object} data { old_password, new_password }
+ */
+export function changePassword(data) {
+    return request({
+        url: '/auth/change_password',
+        method: 'post',
+        data
+    })
+}
+
+/**
+ * 修改用户名
+ * @param {object} data { new_username }
+ */
+export function changeUsername(data) {
+    return request({
+        url: '/auth/change_username',
+        method: 'post',
+        data
+    })
+}
+
+/**
+ * 修改邮箱
+ * @param {object} data { new_email, password }
+ */
+export function changeEmail(data) {
+    return request({
+        url: '/auth/change_email',
+        method: 'post',
+        data
+    })
+}
