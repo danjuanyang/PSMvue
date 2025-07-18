@@ -3,7 +3,7 @@
     <!-- 页面头部 -->
     <div class="page-header">
       <h1 class="page-title">系统公告</h1>
-      <a-button type="primary" @click="openModal('create')" v-if="isAdmin">
+      <a-button type="primary" @click="openModal('create')" v-if="hasPermission('manage_announcements')">
         <template #icon><PlusOutlined /></template>
         发布新公告
       </a-button>
@@ -178,6 +178,7 @@
 import { ref, onMounted, computed } from "vue";
 import { useStore } from "vuex";
 
+const hasPermission = computed(() => store.getters["user/hasPermission"]);
 import {
   getAnnouncements,
   getAnnouncementDetail,

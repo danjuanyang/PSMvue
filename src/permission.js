@@ -1,97 +1,61 @@
 // src/permission.js
 import router from './router'
 import store from './store'
-import {
-    message
-} from 'ant-design-vue'
+import { message } from 'ant-design-vue'
 import NProgress from 'nprogress'
 import 'nprogress/nprogress.css'
-import {
-    getToken
-} from '@/utils/auth'
+import { getToken } from '@/utils/auth'
 
-NProgress.configure({
-    showSpinner: false
-});
+NProgress.configure({ showSpinner: false });
 
 const whiteList = ['/login']; // 免登录白名单
 
-// 全局的路由添加状态标志
+// 全局标志，用于跟踪动态路由是否已添加
+// This is crucial to prevent infinite loops and handle page refreshes.
 let hasAddedRoutes = false;
 
 router.beforeEach(async (to, from, next) => {
     NProgress.start();
 
-    // 设置页面标题
     document.title = to.meta.title ? `${to.meta.title} - PSM System` : 'PSM System';
 
     const hasToken = getToken();
 
     if (hasToken) {
         if (to.path === '/login') {
-            // 如果已登录，重定向到主页
-            next({
-                path: '/'
-            });
+            // 如果已登录，直接重定向到主页
+            next({ path: '/' });
             NProgress.done();
         } else {
-            // 检查用户是否已获取其角色信息
-            const hasRoles = store.getters['user/roles'] && store.getters['user/roles'].length > 0;
-            if (hasRoles) {
-                // 如果已有角色信息，并且路由已添加，则直接放行
-                if (hasAddedRoutes) {
-                    next();
-                } else {
-                    // 这种情况可能在手动刷新页面后发生，此时需要重新生成并添加路由
-                    try {
-                        const accessRoutes = await store.dispatch('permission/generateRoutes', {
-                            roles: store.getters['user/roles'],
-                            permissions: store.getters['user/permissions']
-                        });
-
-                        accessRoutes.forEach(route => {
-                            router.addRoute(route);
-                        });
-                        hasAddedRoutes = true;
-                        next({
-                            ...to,
-                            replace: true
-                        });
-                    } catch (error) {
-                        // ...错误处理...
-                    }
-                }
+            // 检查路由是否已经添加
+            if (hasAddedRoutes) {
+                // 如果动态路由已添加，则直接放行
+                next();
             } else {
                 try {
-                    // 首次进入或刷新页面，获取用户信息
-                    const {
-                        roles,
-                        permissions
-                    } = await store.dispatch('user/getInfo');
+                    // 动态路由未添加，这是首次加载或刷新页面
+                    // 1. 获取用户信息 (包括角色和权限)
+                    const { roles, permissions } = await store.dispatch('user/getInfo');
 
-                    // 根据角色和权限生成可访问的路由
-                    const accessRoutes = await store.dispatch('permission/generateRoutes', {
-                        roles,
-                        permissions
-                    });
+                    // 2. 根据角色和权限生成可访问的路由
+                    const accessRoutes = await store.dispatch('permission/generateRoutes', { roles, permissions });
 
-                    // 动态添加可访问的路由
+                    // 3. 动态添加这些路由
                     accessRoutes.forEach(route => {
                         router.addRoute(route);
                     });
 
-                    // 标记路由已添加
+                    // 4. 将标志位设置为 true
                     hasAddedRoutes = true;
 
-                    // 使用 replace: true 来确保导航不会留下历史记录
-                    // 这样当用户点击后退时，不会返回到触发路由生成之前的状态
-                    next({
-                        ...to,
-                        replace: true
-                    });
+                    // 5. 使用 `next({ ...to, replace: true })` 来重新发起导航
+                    // 这会确保新的导航会匹配到刚刚添加的动态路由
+                    // 这是解决动态路由“No match found”问题的关键
+                    next({ ...to, replace: true });
 
                 } catch (error) {
-                    // 如果获取用户信息失败，重置Token并跳转到登录页
+                    // 如果过程中出现任何错误（如 token 失效）
+                    // 清理前端状态并重定向到登录页
                     await store.dispatch('user/logout');
                     message.error(error.message || '验证失败，请重新登录。');
                     next(`/login?redirect=${to.path}`);
@@ -100,18 +64,28 @@ router.beforeEach(async (to, from, next) => {
             }
         }
     } else {
-        // 没有Token
+        // 用户未登录 (没有 token)
         hasAddedRoutes = false; // 重置路由添加状态
         if (whiteList.indexOf(to.path) !== -1) {
-            // 在免登录白名单中，直接放行
+            // 如果在免登录白名单中，直接放行
             next();
         } else {
-            // 其他没有访问权限的页面将重定向到登录页面
+            // 否则，全部重定向到登录页
             next(`/login?redirect=${to.path}`);
             NProgress.done();
         }
     }
 });
+
+// 在登出逻辑中，必须重置 hasAddedRoutes 标志
+// 我们需要在 store/modules/user.js 的 logout action 中也确保这一点
+// 这里我们可以在 logout action 之后，或者在跳转到 login 之前重置
+store.subscribe((mutation) => {
+    if (mutation.type === 'user/SET_TOKEN' && !mutation.payload) {
+        hasAddedRoutes = false;
+    }
+});
+
 
 router.afterEach(() => {
     NProgress.done();

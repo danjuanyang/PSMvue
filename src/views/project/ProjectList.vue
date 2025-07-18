@@ -1,49 +1,64 @@
 <template>
   <div class="page-container">
-    <!-- 页面头部 -->
+    <!-- Debug Info Box -->
+    <a-alert
+      v-if="currentUser"
+      type="info"
+      show-icon
+      closable
+      style="margin-bottom: 16px"
+    >
+      <template #message>
+        <div style="font-family: monospace; font-size: 12px;">
+          <p><strong>当前用户信息:</strong> {{ JSON.stringify(currentUser, null, 2) }}</p>
+          <p><strong>当前权限列表:</strong> {{ JSON.stringify(permissions, null, 2) }}</p>
+          <p><strong>是否包含 'manage_projects' 权限:</strong> {{ hasPermission('manage_projects') }}</p>
+          <p><strong>是否包含 'delete_projects' 权限:</strong> {{ hasPermission('delete_projects') }}</p>
+          <p><strong>是否包含 'view_users' 权限:</strong> {{ hasPermission('view_users') }}</p>
+        </div>
+      </template>
+    </a-alert>
+
+    <!-- Page Header -->
     <div class="page-header">
       <h1 class="page-title">项目列表</h1>
-      <a-button type="primary" @click="openProjectModal()" v-if="isAdmin">
+      <a-button type="primary" @click="openProjectModal()" v-if="hasPermission('manage_projects')">
         <template #icon><PlusOutlined /></template>
         创建新项目
       </a-button>
     </div>
 
-    <!-- 项目表格 -->
+    <!-- Projects Table -->
     <a-card :bordered="false">
       <a-table :columns="columns" :data-source="projects" row-key="id" :loading="loading">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'name'">
-            <!-- 修改：使用 @click 事件跳转 -->
             <a @click="handleViewDetails(record)">{{ record.name }}</a>
           </template>
           <template v-if="column.key === 'progress'">
             <a-progress :percent="record.progress" />
           </template>
           <template v-if="column.key === 'status'">
-            <a-tag :color="getStatusColor(record.status)">{{
-              getStatusText(record.status)
-            }}</a-tag>
+            <a-tag :color="getStatusColor(record.status)">{{ getStatusText(record.status) }}</a-tag>
           </template>
           <template v-if="column.key === 'action'">
             <a-space>
               <a-button type="link" @click="handleViewDetails(record)">查看详情</a-button>
-              <template v-if="isAdmin">
-                <a-button type="link" @click="openProjectModal(record)">编辑</a-button>
-                <a-popconfirm
-                  title="确定要删除这个项目吗？所有相关数据将一并删除。"
-                  @confirm="handleDeleteProject(record.id)"
-                >
-                  <a-button type="link" danger>删除</a-button>
-                </a-popconfirm>
-              </template>
+              <a-button type="link" @click="openProjectModal(record)" v-if="hasPermission('manage_projects')">编辑</a-button>
+              <a-popconfirm
+                title="确定要删除这个项目吗？所有相关数据将一并删除。"
+                @confirm="handleDeleteProject(record.id)"
+                v-if="hasPermission('delete_projects')"
+              >
+                <a-button type="link" danger>删除</a-button>
+              </a-popconfirm>
             </a-space>
           </template>
         </template>
       </a-table>
     </a-card>
 
-    <!-- 创建/编辑项目 Modal (代码保持不变) -->
+    <!-- Create/Edit Project Modal -->
     <a-modal
       v-model:open="isModalVisible"
       :title="modalTitle"
@@ -51,36 +66,22 @@
       :confirm-loading="modalLoading"
     >
       <a-form ref="formRef" :model="formState" layout="vertical" name="project_form">
-        <a-form-item
-          name="name"
-          label="项目名称"
-          :rules="[{ required: true, message: '请输入项目名称' }]"
-        >
+        <a-form-item name="name" label="项目名称" :rules="[{ required: true, message: '请输入项目名称' }]">
           <a-input v-model:value="formState.name" />
         </a-form-item>
-        <a-form-item name="description" label="项目描述"
-        :rules="[{ required: true, message: '请输入项目名称' }]"
-        >
+        <a-form-item name="description" label="项目描述" :rules="[{ required: true, message: '请输入项目描述' }]">
           <a-textarea v-model:value="formState.description" :rows="4" />
         </a-form-item>
         <a-form-item name="employee_id" label="项目负责人 (组长)" :rules="[{ required: true, message: '请选择一个负责人' }]">
-          <a-select
-            v-model:value="formState.employee_id"
-            placeholder="请选择一个负责人"
-            :loading="leaders.length === 0"
-          >
-            <a-select-option
-              v-for="leader in leaders"
-              :key="leader.id"
-              :value="leader.id"
-            >
+          <a-select v-model:value="formState.employee_id" placeholder="请选择一个负责人" :loading="leaders.length === 0">
+            <a-select-option v-for="leader in leaders" :key="leader.id" :value="leader.id">
               {{ leader.username }}
             </a-select-option>
           </a-select>
         </a-form-item>
         <a-row :gutter="16">
           <a-col :span="12">
-            <a-form-item name="start_date" label="开始日期" :rules="[{ required: true, message: '请选择开始日期' }]" >
+            <a-form-item name="start_date" label="开始日期" :rules="[{ required: true, message: '请选择开始日期' }]">
               <a-date-picker v-model:value="formState.start_date" style="width: 100%" />
             </a-form-item>
           </a-col>
@@ -125,8 +126,9 @@ const formRef = ref();
 const formState = ref({});
 const isEditMode = ref(false);
 
-const userRole = computed(() => store.getters["user/userRole"]);
-const isAdmin = computed(() => userRole.value === "SUPER" || userRole.value === "ADMIN");
+const currentUser = computed(() => store.state.user.user);
+const permissions = computed(() => store.state.user.permissions);
+const hasPermission = computed(() => store.getters["user/hasPermission"]);
 
 const fetchProjects = async () => {
   loading.value = true;
@@ -134,6 +136,7 @@ const fetchProjects = async () => {
     projects.value = await getProjects();
   } catch (error) {
     message.error("加载项目列表失败");
+    console.error("Failed to fetch projects:", error);
   } finally {
     loading.value = false;
   }
@@ -144,13 +147,16 @@ const fetchLeaders = async () => {
     const response = await getUsers();
     leaders.value = response.users.filter((user) => user.role === "LEADER");
   } catch (error) {
-    message.error("加载负责人列表失败");
+    message.error("加载负责人列表失败，请确认您有[view_users]权限");
+    console.error("Failed to fetch leaders:", error);
   }
 };
 
 onMounted(() => {
   fetchProjects();
-  if (isAdmin.value) {
+  // If user can manage projects, they need to be able to select a leader.
+  // This requires the 'view_users' permission.
+  if (hasPermission.value('manage_projects')) {
     fetchLeaders();
   }
 });
@@ -179,9 +185,7 @@ const handleModalOk = async () => {
 
     const dataToSend = {
       ...formState.value,
-      start_date: formState.value.start_date
-        ? formState.value.start_date.toISOString()
-        : null,
+      start_date: formState.value.start_date ? formState.value.start_date.toISOString() : null,
       deadline: formState.value.deadline ? formState.value.deadline.toISOString() : null,
     };
 
@@ -212,7 +216,6 @@ const handleDeleteProject = async (projectId) => {
   }
 };
 
-// --- 修改：使用 router.push 跳转 ---
 const handleViewDetails = (project) => {
   router.push(`/project/detail/${project.id}`);
 };
